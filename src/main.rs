@@ -46,6 +46,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .short("c")
                 .help("if the favicon image should be printed with ANSII color formatting or monochrome")
         )
+        .arg(
+            Arg::with_name("size")
+                .short("s")
+                .help("the size of the image")
+                .takes_value(true)
+                .default_value("16")
+        )
         .get_matches();
 
     let mut config = ConnectionConfig::build(matches.value_of("ip").unwrap().to_owned());
@@ -75,8 +82,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
         let img = image_base64::from_base64(favicon);
         let image = image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
+        let image_size: u32 = matches.value_of("size").unwrap().parse().expect("image size must be number");
         AsciiBuilder::new_from_image(image)
-            .set_resize((32, 16))
+            .set_resize((image_size * 2, image_size))
             .to_std_out(matches.is_present("color"));
     }
     //endregion
