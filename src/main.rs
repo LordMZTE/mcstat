@@ -1,9 +1,14 @@
-use clap::{App, Arg};
-use image::ImageFormat;
-use asciify::AsciiBuilder;
+use std::error::Error;
 use std::io::Cursor;
 
-fn main() {
+use asciify::AsciiBuilder;
+use async_minecraft_ping::ConnectionConfig;
+use clap::{App, Arg};
+use image::ImageFormat;
+use itertools::Itertools;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     let matches = App::new("mcstat")
         .about("queries information about a minecraft server")
         .arg(
@@ -43,34 +48,37 @@ fn main() {
         )
         .get_matches();
 
-    let response = mcio::ping(
-        matches.value_of("ip").unwrap(),
-        matches.value_of("port").unwrap().parse().ok().and_then(|p| if p > 0 && p < u16::MAX {Some(p)} else {None}).expect("invalid port"),
-        matches.value_of("protocol-version").unwrap().parse().expect("invalid protocol version"),
-    ).expect("invalid response from server");
+    let mut config = ConnectionConfig::build(matches.value_of("ip").unwrap().to_owned());
+    config = config.with_port(matches.value_of("port").unwrap().parse().ok().and_then(|p| if p > 0 && p < u16::MAX { Some(p) } else { None }).expect("invalid port"));
+    config = config.with_protocol_version(matches.value_of("protocol-version").unwrap().parse().expect("invalid protocol version"));
+    let mut connection = config.connect().await?;
+    let response = connection.status().await?;
 
 
-    //region printing
     macro_rules! print_table {
         ($($l:expr => $k:expr),+) => {
             $(println!("{: <15} | {}", $l, $k);)*
         };
     }
 
+    //region printing
     print_table!(
         "Online Players" => response.players.online,
         "Max Players" => response.players.max,
         "Server Version" => response.version.name,
-        "Server Protocol" => response.version.protocol
+        "Server Protocol" => response.version.protocol,
+        "Player Sample" => response.players.sample.unwrap_or_default().iter().map(|p| p.name.as_str()).intersperse(", ").collect::<String>(),
+        "Description" => response.description.text
     );
 
     //Image
-    if matches.is_present("image") {
-        let img = image_base64::from_base64(response.favicon);
+    if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
+        let img = image_base64::from_base64(favicon);
         let image = image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
         AsciiBuilder::new_from_image(image)
             .set_resize((32, 16))
             .to_std_out(matches.is_present("color"));
     }
     //endregion
+    Ok(())
 }
