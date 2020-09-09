@@ -15,11 +15,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let yaml = load_yaml!("args.yml");
     let matches = App::from_yaml(yaml).get_matches();
 
-
     //region Network
-    let mut config = ConnectionConfig::build(matches.value_of("ip").unwrap().to_owned());
-    config = config.with_port(matches.value_of("port").unwrap().parse().ok().and_then(|p| if p > 0 && p < u16::MAX { Some(p) } else { None }).expect("invalid port"));
-    config = config.with_protocol_version(matches.value_of("protocol-version").unwrap().parse().expect("invalid protocol version"));
+    let config = ConnectionConfig::build(matches.value_of("ip").unwrap().to_owned())
+        .with_port(
+            matches
+                .value_of("port")
+                .unwrap()
+                .parse()
+                .ok()
+                .and_then(|p| if p > 0 && p < u16::MAX { Some(p) } else { None })
+                .expect("invalid port"),
+        )
+        .with_protocol_version(
+            matches
+                .value_of("protocol-version")
+                .unwrap()
+                .parse()
+                .expect("invalid protocol version"),
+        );
     let mut connection = config.connect().await?;
     let response = connection.status().await?;
     //endregion
@@ -51,7 +64,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         };
     }
 
-    let player_sample = response.players.sample.unwrap_or_default().iter().map(|p| p.name.as_str()).intersperse(", ").collect::<String>();
+    let player_sample = response
+        .players
+        .sample
+        .unwrap_or_default()
+        .iter()
+        .map(|p| p.name.as_str())
+        .intersperse(", ")
+        .collect::<String>();
+
     print_table!(
         me "Description" => remove_formatting(&response.description.text),
         me "Player Sample" => remove_formatting(&player_sample),
@@ -64,8 +85,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     //Image
     if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
         let img = image_base64::from_base64(favicon);
-        let image = image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
-        let image_size: u32 = matches.value_of("size").unwrap().parse().expect("image size must be number");
+        let image =
+            image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
+        let image_size: u32 = matches
+            .value_of("size")
+            .unwrap()
+            .parse()
+            .expect("image size must be number");
         AsciiBuilder::new_from_image(image)
             .set_resize((image_size * 2, image_size))
             .to_std_out(matches.is_present("color"));
