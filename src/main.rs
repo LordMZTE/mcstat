@@ -63,19 +63,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 
     macro_rules! print_table {
-        ($($l:expr => $k:expr),+) => {
-            $(println!("{: <15} | {}", $l, $k);)*
+        (s $l:expr => $k:expr) => {
+            println!("{: <20} | {}", $l, $k);
+        };
+
+        (m $l:expr => $k:expr) => {
+            println!("====={:=<20}\n{}", $l, $k);
+        };
+
+        (se $l:expr => $k:expr) => {
+            if !&$k.is_empty() {
+                println!("{: <20} | {}", $l, $k);
+            }
+        };
+
+        (me $l:expr => $k:expr) => {
+            if !&$k.is_empty() {
+                println!("====={:=<20}\n{}\n=========================\n", $l, $k);
+            }
+        };
+
+        ($($t:tt $l:expr => $k:expr),+) => {
+            $(print_table!($t $l => $k);)*
         };
     }
 
     //region printing
+    let player_sample = response.players.sample.unwrap_or_default().iter().map(|p| p.name.as_str()).intersperse(", ").collect::<String>();
     print_table!(
-        "Online Players" => response.players.online,
-        "Max Players" => response.players.max,
-        "Server Version" => response.version.name,
-        "Server Protocol" => response.version.protocol,
-        "Player Sample" => response.players.sample.unwrap_or_default().iter().map(|p| p.name.as_str()).intersperse(", ").collect::<String>(),
-        "Description" => response.description.text
+        me "Description" => remove_formatting(&response.description.text),
+        me "Player Sample" => remove_formatting(&player_sample),
+        se "Server Version" => response.version.name,
+        s "Online Players" => response.players.online,
+        s "Max Players" => response.players.max,
+        s "Server Protocol" => response.version.protocol
     );
 
     //Image
@@ -89,4 +110,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     //endregion
     Ok(())
+}
+
+fn remove_formatting(s: &str) -> String {
+    let chars = s.char_indices().rev();
+    let mut buf = s.to_owned();
+    for c in chars {
+        if c.1 == '§' {
+            buf.remove(c.0);
+            if c.0 < buf.len() {
+                buf.remove(c.0);
+            }
+        }
+    }
+    buf
 }
