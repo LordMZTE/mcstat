@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "^2.33"
+clap = { version = "^2.33", features = ["yaml"] }
 image-base64 = "0.1.0"
 image = "0.23.9"
 asciify = "0.1.5"

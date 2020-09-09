@@ -1,0 +1,33 @@
+name: "mcstat"
+about: "queries information about a minecraft server"
+args:
+  - ip:
+      value_name: "IP_ADDRESS"
+      help: "the ip of the server to ping"
+      takes_value: true
+      index: 1
+      required: true
+  - port:
+      value_name: "PORT"
+      help: "the port of the server"
+      long: "port"
+      short: p
+      default_value: "25565"
+      takes_value: true
+  - protocol-version:
+      long: "protocol"
+      value_name: "PROTOCOL_VERSION"
+      help: "the protocol version to use"
+      default_value: "751"
+      takes_value: true
+  - image:
+      short: i
+      help: "if the server's favicon should be printed as ASCII art"
+  - color:
+      short: c
+      help: "if the favicon image should be printed with ANSII color formatting or monochrome"
+  - size:
+      short: s
+      help: "the size of the image"
+      takes_value: true
+      default_value: "16"
