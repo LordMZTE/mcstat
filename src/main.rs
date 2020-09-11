@@ -70,7 +70,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_default()
         .iter()
         .map(|p| p.name.as_str())
-        .intersperse(", ")
+        .intersperse("\n")
         .collect::<String>();
 
     print_table!(
