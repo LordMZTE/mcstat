@@ -37,6 +37,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let response = connection.status().await?;
     //endregion
 
+    //region Image
+    //The image parsing and asciifying is done while the table is printing
+    let image_size: u32 = matches
+        .value_of("size")
+        .unwrap()
+        .parse()
+        .expect("image size must be number");
+
+    let mut image = None;
+
+    if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
+        image = Some(tokio::spawn(get_image(favicon, image_size)));
+    }
+    //endregion
+
     //region printing
     macro_rules! print_table {
         (s $l:expr => $k:expr) => {
@@ -82,19 +97,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         s "Server Protocol" => response.version.protocol
     );
 
-    //Image
-    if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
-        let img = image_base64::from_base64(favicon);
-        let image =
-            image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
-        let image_size: u32 = matches
-            .value_of("size")
-            .unwrap()
-            .parse()
-            .expect("image size must be number");
-        AsciiBuilder::new_from_image(image)
-            .set_resize((image_size * 2, image_size))
-            .to_std_out(matches.is_present("color"));
+    if let Some(img) = image {
+        img.await?.to_std_out(matches.is_present("color"));
+        //Reset formatting
+        print!("\u{001b}[0m")
     }
     //endregion
     Ok(())
@@ -112,4 +118,12 @@ fn remove_formatting(s: &str) -> String {
         }
     }
     buf
+}
+
+async fn get_image(favicon: String, image_size: u32) -> AsciiBuilder {
+    let img = image_base64::from_base64(favicon);
+    let image =
+        image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
+
+    AsciiBuilder::new_from_image(image).set_resize((image_size * 2, image_size))
 }

@@ -25,7 +25,7 @@ args:
       help: "if the server's favicon should be printed as ASCII art"
   - color:
       short: c
-      help: "if the favicon image should be printed with ANSII color formatting or monochrome"
+      help: "if the favicon image should be printed with ANSI color formatting or monochrome"
   - size:
       short: s
       help: "the size of the image"
