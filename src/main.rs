@@ -49,8 +49,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         //The image parsing and asciifying is done while the table is printing
         image = Some(tokio::spawn(get_image(
             favicon,
-            image_size,
-            matches.is_present("color"),
+            AsciiConfig {
+                size: Some(image_size),
+                colored: matches.is_present("color"),
+                deep: matches.is_present("deep"),
+                invert: matches.is_present("invert"),
+            },
         )));
     }
     //endregion
@@ -124,14 +128,14 @@ fn remove_formatting(s: &str) -> String {
 }
 
 /// returns the asciifyed image as UTF-8 bytes
-async fn get_image(favicon: String, image_size: u32, colored: bool) -> Vec<u8> {
+async fn get_image(favicon: String, config: AsciiConfig) -> Vec<u8> {
     let img = image_base64::from_base64(favicon);
     let image =
         image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
 
-    let builder = AsciiBuilder::new_from_image(image).set_resize((image_size * 2, image_size));
+    let builder = config.apply(AsciiBuilder::new_from_image(image));
 
-    let mut buf = if colored {
+    let mut buf = if config.colored {
         //this does not write to stdout but just gets the correct color information for stdout
         let mut buf = BufferWriter::stdout(ColorChoice::Always).buffer();
         builder.to_stream_colored(&mut buf);
@@ -143,4 +147,20 @@ async fn get_image(favicon: String, image_size: u32, colored: bool) -> Vec<u8> {
     };
     buf.reset().unwrap();
     buf.as_slice().to_vec()
+}
+
+struct AsciiConfig {
+    size: Option<u32>,
+    colored: bool,
+    deep: bool,
+    invert: bool,
+}
+
+impl AsciiConfig {
+    pub fn apply(&self, mut builder: AsciiBuilder) -> AsciiBuilder {
+        if let Some(n) = self.size {
+            builder = builder.set_resize((n * 2, n))
+        }
+        builder.set_deep(self.deep).set_invert(self.invert)
+    }
 }
