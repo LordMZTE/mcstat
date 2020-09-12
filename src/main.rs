@@ -107,6 +107,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(img) = image {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
+        handle.write_all(&[b'\n'])?;
         handle.write_all(&img.await?)?;
     }
     //endregion
