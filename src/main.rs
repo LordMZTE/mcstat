@@ -132,6 +132,7 @@ async fn get_image(favicon: String, image_size: u32, colored: bool) -> Vec<u8> {
     let builder = AsciiBuilder::new_from_image(image).set_resize((image_size * 2, image_size));
 
     let mut buf = if colored {
+        //this does not write to stdout but just gets the correct color information for stdout
         let mut buf = BufferWriter::stdout(ColorChoice::Always).buffer();
         builder.to_stream_colored(&mut buf);
         buf
@@ -141,6 +142,5 @@ async fn get_image(favicon: String, image_size: u32, colored: bool) -> Vec<u8> {
         buf
     };
     buf.reset().unwrap();
-    buf.as_slice()
-    .to_vec()
+    buf.as_slice().to_vec()
 }
