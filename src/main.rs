@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate mcstat;
 
 use std::io::{Cursor, Write};
 
+use mcstat::{AsciiConfig, remove_formatting};
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
 use async_minecraft_ping::ConnectionConfig;
@@ -60,32 +63,6 @@ async fn main() -> Result<()> {
     //endregion
 
     //region printing
-    macro_rules! print_table {
-        (s $l:expr => $k:expr) => {
-            println!("{: <20} | {}", $l, $k);
-        };
-
-        (m $l:expr => $k:expr) => {
-            println!("====={:=<20}\n{}", $l, $k);
-        };
-
-        (se $l:expr => $k:expr) => {
-            if !&$k.is_empty() {
-                println!("{: <20} | {}", $l, $k);
-            }
-        };
-
-        (me $l:expr => $k:expr) => {
-            if !&$k.is_empty() {
-                println!("====={:=<20}\n{}\n=========================\n", $l, $k);
-            }
-        };
-
-        ($($t:tt $l:expr => $k:expr),+) => {
-            $(print_table!($t $l => $k);)*
-        };
-    }
-
     let player_sample = response
         .players
         .sample
@@ -114,20 +91,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn remove_formatting(s: &str) -> String {
-    let chars = s.char_indices().rev();
-    let mut buf = s.to_owned();
-    for c in chars {
-        if c.1 == '§' {
-            buf.remove(c.0);
-            if c.0 < buf.len() {
-                buf.remove(c.0);
-            }
-        }
-    }
-    buf
-}
-
 /// returns the asciifyed image as UTF-8 bytes
 async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
     let img = image_base64::from_base64(favicon);
@@ -148,20 +111,4 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
     };
     buf.reset()?;
     Ok(buf.as_slice().to_vec())
-}
-
-struct AsciiConfig {
-    size: Option<u32>,
-    colored: bool,
-    deep: bool,
-    invert: bool,
-}
-
-impl AsciiConfig {
-    pub fn apply(&self, mut builder: AsciiBuilder) -> AsciiBuilder {
-        if let Some(n) = self.size {
-            builder = builder.set_resize((n * 2, n))
-        }
-        builder.set_deep(self.deep).set_invert(self.invert)
-    }
 }
