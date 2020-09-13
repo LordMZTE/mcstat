@@ -19,28 +19,33 @@ args:
           takes_value: true
 
     # IMAGE ARGS
+    # TODO due to a bug in clap, the image argument is always required because size has a default value
     - image:
-        short: i
+        short: "i"
         help: "if the server's favicon should be printed as ASCII art"
+        required: false
     - color:
-        short: c
+        short: "c"
         help: "if the favicon image should be printed with ANSI color formatting or monochrome"
     - size:
-        short: s
+        short: "s"
         help: "the size of the image"
         takes_value: true
         default_value: "16"
     - deep:
-        short: d
+        short: "d"
         help: "if provided the ascii image will have more different characters"
     - invert:
-        short: n
+        short: "n"
         help: "inverts the ascii image thickness"
 
 groups:
     - img-flags:
-          requires: "image"
+        # TODO uncomment unce bug is fixed
+        #   requires: 
+        #     - image
           multiple: true
+          required: false
           args:
             - color
             - size

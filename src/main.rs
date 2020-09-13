@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate clap;
 
-use std::error::Error;
 use std::io::{Cursor, Write};
 
+use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
 use async_minecraft_ping::ConnectionConfig;
 use clap::App;
@@ -12,7 +12,7 @@ use itertools::Itertools;
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     let yaml = load_yaml!("args.yml");
     let matches = App::from_yaml(yaml).get_matches();
 
@@ -25,14 +25,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .parse()
                 .ok()
                 .and_then(|p| if p > 0 && p < u16::MAX { Some(p) } else { None })
-                .expect("invalid port"),
+                .context("invalid port")?,
         )
         .with_protocol_version(
             matches
                 .value_of("protocol-version")
                 .unwrap()
                 .parse()
-                .expect("invalid protocol version"),
+                .context("invalid protocol version")?,
         );
     let mut connection = config.connect().await?;
     let response = connection.status().await?;
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .value_of("size")
         .unwrap()
         .parse()
-        .expect("image size must be number");
+        .with_context(|| "image size must be number")?;
     let mut image = None;
     if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
         //The image parsing and asciifying is done while the table is printing
@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let stdout = std::io::stdout();
         let mut handle = stdout.lock();
         handle.write_all(&[b'\n'])?;
-        handle.write_all(&img.await?)?;
+        handle.write_all(&img.await??)?;
     }
     //endregion
     Ok(())
@@ -129,10 +129,10 @@ fn remove_formatting(s: &str) -> String {
 }
 
 /// returns the asciifyed image as UTF-8 bytes
-async fn get_image(favicon: String, config: AsciiConfig) -> Vec<u8> {
+async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
     let img = image_base64::from_base64(favicon);
     let image =
-        image::load(Cursor::new(img), ImageFormat::Png).expect("favicon has invalid format");
+        image::load(Cursor::new(img), ImageFormat::Png).context("favicon has invalid format")?;
 
     let builder = config.apply(AsciiBuilder::new_from_image(image));
 
@@ -146,8 +146,8 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Vec<u8> {
         builder.to_stream(&mut buf);
         buf
     };
-    buf.reset().unwrap();
-    buf.as_slice().to_vec()
+    buf.reset()?;
+    Ok(buf.as_slice().to_vec())
 }
 
 struct AsciiConfig {
