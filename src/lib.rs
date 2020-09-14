@@ -1,4 +1,3 @@
-
 use asciify::AsciiBuilder;
 
 #[macro_export]
@@ -27,6 +26,7 @@ macro_rules! print_table {
         $(print_table!($t $l => $k);)*
     };
 }
+
 pub struct AsciiConfig {
     pub size: Option<u32>,
     pub colored: bool,
