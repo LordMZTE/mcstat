@@ -2,52 +2,81 @@
 extern crate clap;
 #[macro_use]
 extern crate mcstat;
+#[macro_use]
+extern crate anyhow;
 
 use std::io::{Cursor, Write};
+use time::Duration;
+use tokio::time;
 
-use mcstat::{AsciiConfig, remove_formatting};
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
-use async_minecraft_ping::ConnectionConfig;
+use async_minecraft_ping::{ConnectionConfig, StatusResponse};
 use clap::App;
 use image::ImageFormat;
 use itertools::Itertools;
+use mcstat::{remove_formatting, AsciiConfig};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
+const ARGUMENT_FAIL_MESSAGE: &str = "failed to get value from args";
 #[tokio::main]
 async fn main() -> Result<()> {
     let yaml = load_yaml!("args.yml");
     let matches = App::from_yaml(yaml).get_matches();
 
     //region Network
-    let config = ConnectionConfig::build(matches.value_of("ip").unwrap().to_owned())
-        .with_port(
-            matches
-                .value_of("port")
-                .unwrap()
-                .parse()
-                .ok()
-                .and_then(|p| if p > 0 && p < u16::MAX { Some(p) } else { None })
-                .context("invalid port")?,
-        )
-        .with_protocol_version(
-            matches
-                .value_of("protocol-version")
-                .unwrap()
-                .parse()
-                .context("invalid protocol version")?,
-        );
-    let mut connection = config.connect().await?;
-    let response = connection.status().await?;
+    let config = ConnectionConfig::build(
+        matches
+            .value_of("ip")
+            .context(ARGUMENT_FAIL_MESSAGE)?
+            .to_owned(),
+    )
+    .with_port(
+        matches
+            .value_of("port")
+            .context(ARGUMENT_FAIL_MESSAGE)?
+            .parse()
+            .context("invalid port")
+            .and_then(|p| {
+                if p > 0 && p < u16::MAX {
+                    Ok(p)
+                } else {
+                    Err(anyhow!(ARGUMENT_FAIL_MESSAGE))
+                }
+            })
+            .context("invalid port")?,
+    )
+    .with_protocol_version(
+        matches
+            .value_of("protocol-version")
+            .context(ARGUMENT_FAIL_MESSAGE)?
+            .parse()
+            .context("invalid protocol version")?,
+    );
+
+    //create timeout for server connection
+    let mut timeout = time::delay_for(Duration::from_millis(
+        matches
+            .value_of("timeout")
+            .context(ARGUMENT_FAIL_MESSAGE)?
+            .parse()
+            .context("timeout is invalid value")?,
+    ));
+
+    let response = tokio::select! {
+        _ = &mut timeout => Err(anyhow!("Connection to server timed out")),
+        r = ping_server(config) => r,
+    }?;
     //endregion
 
     //region Image
     let image_size: u32 = matches
         .value_of("size")
-        .unwrap()
+        .context("failed to get value from args")?
         .parse()
-        .with_context(|| "image size must be number")?;
+        .context("image size must be number")?;
     let mut image = None;
+
     if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
         //The image parsing and asciifying is done while the table is printing
         image = Some(tokio::spawn(get_image(
@@ -111,4 +140,9 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
     };
     buf.reset()?;
     Ok(buf.as_slice().to_vec())
+}
+
+async fn ping_server(server: ConnectionConfig) -> Result<StatusResponse> {
+    let mut con = server.connect().await?;
+    con.status().await
 }

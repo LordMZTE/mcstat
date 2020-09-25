@@ -17,6 +17,12 @@ args:
           help: "the protocol version to use"
           default_value: "751"
           takes_value: true
+    - timeout:
+          long: "timeout"
+          short: t
+          help: "the time before the server ping times out in milliseconds"
+          takes_value: true
+          default_value: "500"
 
     # IMAGE ARGS
     # TODO due to a bug in clap, the image argument is always required because size has a default value
