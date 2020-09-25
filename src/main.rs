@@ -11,7 +11,7 @@ use tokio::time;
 
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
-use async_minecraft_ping::{ConnectionConfig, StatusResponse};
+use async_minecraft_ping::ConnectionConfig;
 use clap::App;
 use image::ImageFormat;
 use itertools::Itertools;
@@ -65,7 +65,10 @@ async fn main() -> Result<()> {
 
     let response = tokio::select! {
         _ = &mut timeout => Err(anyhow!("Connection to server timed out")),
-        r = ping_server(config) => r,
+        r = async {
+            let mut con = config.connect().await?;
+            con.status().await
+        } => r,
     }?;
     //endregion
 
@@ -140,9 +143,4 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
     };
     buf.reset()?;
     Ok(buf.as_slice().to_vec())
-}
-
-async fn ping_server(server: ConnectionConfig) -> Result<StatusResponse> {
-    let mut con = server.connect().await?;
-    con.status().await
 }
