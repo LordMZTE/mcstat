@@ -10,7 +10,7 @@ edition = "2018"
 clap = { version = "^2.33", features = ["yaml"] }
 image-base64 = "0.1.0"
 image = "0.23.9"
-asciify = { git = "https://github.com/Hkattelu/Asciify" } # TODO replace with crates.io version once 0.1.6 is pushed
+asciify = "0.1.6"
 async-minecraft-ping = "0.2.1"
 tokio = { version = "0.2.22", features = ["full"] }
 itertools = "0.9.0"
