@@ -1,29 +1,56 @@
 use asciify::AsciiBuilder;
 
+/// prints a table with the entries supplied
+/// the identifier at the start of each entry sets the type
+/// 
+/// l = list entry
+/// b = block
+/// lo = list entry option
+/// bo = block option
+/// 
+/// options are checked if they are `Some` and won't be printed if they aren't
 #[macro_export]
 macro_rules! print_table {
-    (s $l:expr => $k:expr) => {
+    //list entry
+    (l $l:expr => $k:expr) => {
         println!("{: <20} | {}", $l, $k);
     };
 
-    (m $l:expr => $k:expr) => {
+    //block
+    (b $l:expr => $k:expr) => {
         println!("{:=^25}\n{}\n=========================\n", $l, $k);
     };
 
-    (se $l:expr => $k:expr) => {
-        if !&$k.is_empty() {
-            println!("{: <20} | {}", $l, $k);
+    //list entry option
+    (lo $l:expr => $k:expr) => {
+        if let Some(txt) = $k {
+            println!("{: <20} | {}", $l, txt);
         }
     };
 
-    (me $l:expr => $k:expr) => {
-        if !&$k.is_empty() {
-            println!("{:=^25}\n{}\n=========================\n", $l, $k);
+    //block option
+    (bo $l:expr => $k:expr) => {
+        if let Some(txt) = $k {
+            println!("{:=^25}\n{}\n=========================\n", $l, txt);
         }
     };
 
     ($($t:tt $l:expr => $k:expr),+ $(,)?) => {
         $(print_table!($t $l => $k);)*
+    };
+}
+
+/// returns an `Option` of the expression passed in
+/// `None` if the `is_empty` on the expression returns true, `Some(x)` otherwise
+/// this is a macro and not a function because `is_empty` is not defined in any trait
+#[macro_export]
+macro_rules! none_if_empty {
+    ($x:expr) => {
+        if $x.is_empty() {
+            None
+        } else {
+            Some($x)
+        }
     };
 }
 

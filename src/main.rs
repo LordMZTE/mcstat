@@ -5,7 +5,7 @@ extern crate mcstat;
 #[macro_use]
 extern crate anyhow;
 
-use std::io::{Cursor, Write};
+use std::io::Cursor;
 use time::Duration;
 use tokio::time;
 
@@ -105,26 +105,24 @@ async fn main() -> Result<()> {
         .collect::<String>();
 
     print_table! {
-        me "Description" => remove_formatting(&response.description.text),
-        me "Player Sample" => remove_formatting(&player_sample),
-        se "Server Version" => remove_formatting(&response.version.name),
-        s "Online Players" => response.players.online,
-        s "Max Players" => response.players.max,
-        s "Server Protocol" => response.version.protocol,
+        bo "Description" => none_if_empty!(remove_formatting(&response.description.text)),
+        bo "Player Sample" => none_if_empty!(remove_formatting(&player_sample)),
+        lo "Server Version" => none_if_empty!(remove_formatting(&response.version.name)),
+        l "Online Players" => response.players.online,
+        l "Max Players" => response.players.max,
+        l "Server Protocol" => response.version.protocol,
     };
 
     if let Some(img) = image {
-        let stdout = std::io::stdout();
-        let mut handle = stdout.lock();
-        handle.write_all(&[b'\n'])?;
-        handle.write_all(&img.await??)?;
+        println!("\n{}", img.await??);
     }
     //endregion
     Ok(())
 }
 
-/// returns the asciifyed image as UTF-8 bytes
-async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
+/// returns the asciifyed image from base64
+/// returns Err if the base64 image is invalid
+async fn get_image(favicon: String, config: AsciiConfig) -> Result<String> {
     let img = image_base64::from_base64(favicon);
     let image =
         image::load(Cursor::new(img), ImageFormat::Png).context("favicon has invalid format")?;
@@ -142,5 +140,14 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Result<Vec<u8>> {
         buf
     };
     buf.reset()?;
-    Ok(buf.as_slice().to_vec())
+
+    let bytes = buf.as_slice().to_vec();
+
+    //only check utf8 format in debug mode
+    #[cfg(debug_assertions)]
+    let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
+    #[cfg(not(debug_assertions))]
+    let out = unsafe { String::from_utf8_unchecked(bytes) };
+
+    Ok(out)
 }
