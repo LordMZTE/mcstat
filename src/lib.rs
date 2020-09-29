@@ -7,7 +7,7 @@ macro_rules! print_table {
     };
 
     (m $l:expr => $k:expr) => {
-        println!("{:=^25}\n{}", $l, $k);
+        println!("{:=^25}\n{}\n=========================\n", $l, $k);
     };
 
     (se $l:expr => $k:expr) => {
