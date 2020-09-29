@@ -104,14 +104,14 @@ async fn main() -> Result<()> {
         .intersperse("\n")
         .collect::<String>();
 
-    print_table!(
+    print_table! {
         me "Description" => remove_formatting(&response.description.text),
         me "Player Sample" => remove_formatting(&player_sample),
         se "Server Version" => remove_formatting(&response.version.name),
         s "Online Players" => response.players.online,
         s "Max Players" => response.players.max,
-        s "Server Protocol" => response.version.protocol
-    );
+        s "Server Protocol" => response.version.protocol,
+    };
 
     if let Some(img) = image {
         let stdout = std::io::stdout();

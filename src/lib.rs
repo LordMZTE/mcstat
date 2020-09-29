@@ -7,7 +7,7 @@ macro_rules! print_table {
     };
 
     (m $l:expr => $k:expr) => {
-        println!("====={:=<20}\n{}", $l, $k);
+        println!("{:=^25}\n{}", $l, $k);
     };
 
     (se $l:expr => $k:expr) => {
@@ -18,11 +18,11 @@ macro_rules! print_table {
 
     (me $l:expr => $k:expr) => {
         if !&$k.is_empty() {
-            println!("====={:=<20}\n{}\n=========================\n", $l, $k);
+            println!("{:=^25}\n{}\n=========================\n", $l, $k);
         }
     };
 
-    ($($t:tt $l:expr => $k:expr),+) => {
+    ($($t:tt $l:expr => $k:expr),+ $(,)?) => {
         $(print_table!($t $l => $k);)*
     };
 }
