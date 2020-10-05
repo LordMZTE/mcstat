@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
 
     if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
         //The image parsing and asciifying is done while the table is printing
-        image = Some(tokio::spawn(get_image(
+        image = Some(tokio::spawn(asciify_base64_image(
             favicon,
             AsciiConfig {
                 size: Some(image_size),
@@ -122,10 +122,10 @@ async fn main() -> Result<()> {
 
 /// returns the asciifyed image from base64
 /// returns Err if the base64 image is invalid
-async fn get_image(favicon: String, config: AsciiConfig) -> Result<String> {
+async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<String> {
     let img = image_base64::from_base64(favicon);
     let image =
-        image::load(Cursor::new(img), ImageFormat::Png).context("favicon has invalid format")?;
+        image::load(Cursor::new(img), ImageFormat::Png).context("image has invalid format")?;
 
     let builder = config.apply(AsciiBuilder::new_from_image(image));
 
@@ -139,6 +139,7 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Result<String> {
         builder.to_stream(&mut buf);
         buf
     };
+    //reset color
     buf.reset()?;
 
     let bytes = buf.as_slice().to_vec();
@@ -147,6 +148,7 @@ async fn get_image(favicon: String, config: AsciiConfig) -> Result<String> {
     #[cfg(debug_assertions)]
     let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
     #[cfg(not(debug_assertions))]
+    //bytes should always be valid utf8
     let out = unsafe { String::from_utf8_unchecked(bytes) };
 
     Ok(out)
