@@ -47,7 +47,7 @@ args:
 
 groups:
     - img-flags:
-        # TODO uncomment unce bug is fixed
+        # TODO uncomment once bug is fixed
         #   requires: 
         #     - image
           multiple: true
