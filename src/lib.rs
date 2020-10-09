@@ -12,31 +12,31 @@ use asciify::AsciiBuilder;
 #[macro_export]
 macro_rules! print_table {
     //list entry
-    (l $l:expr => $k:expr) => {
-        println!("{: <20} | {}", $l, $k);
+    ($width:expr; l $l:expr => $k:expr) => {
+        println!("{: <width$} | {}", $l, $k, width = $width);
     };
 
     //block
-    (b $l:expr => $k:expr) => {
-        println!("{:=^25}\n{}\n=========================", $l, $k);
+    ($width:expr; b $l:expr => $k:expr) => {
+        println!("{:=^width$}\n{}\n{:=<width$}", $l, $k, "", width = $width);
     };
 
     //list entry option
-    (lo $l:expr => $k:expr) => {
+    ($width:expr; lo $l:expr => $k:expr) => {
         if let Some(txt) = $k {
-            println!("{: <20} | {}", $l, txt);
+            println!("{: <width$} | {}", $l, txt, width = $width);
         }
     };
 
     //block option
-    (bo $l:expr => $k:expr) => {
+    ($width:expr; bo $l:expr => $k:expr) => {
         if let Some(txt) = $k {
-            println!("{:=^25}\n{}\n=========================", $l, txt);
+            println!("{:=^width$}\n{}\n{:=<width$}", $l, txt, "", width = $width);
         }
     };
 
-    ($($t:tt $l:expr => $k:expr),+ $(,)?) => {
-        $(print_table!($t $l => $k);)*
+    ($width:expr; $($t:tt $l:expr => $k:expr),+ $(,)?) => {
+        $(print_table!($width; $t $l => $k);)*
     };
 }
 

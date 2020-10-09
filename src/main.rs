@@ -105,6 +105,7 @@ async fn main() -> Result<()> {
         .collect::<String>();
 
     print_table! {
+        40;
         bo "Raw Json" => if matches.is_present("raw") {Some(raw_response)} else {None},
         bo "Description" => none_if_empty!(remove_formatting(&response.description.get_text())),
         bo "Extra Description" => {
@@ -124,7 +125,7 @@ async fn main() -> Result<()> {
         l "Online Players" => response.players.online,
         l "Max Players" => response.players.max,
         bo "Mods" => if let (Some(mods), true) = (response.modinfo, matches.is_present("mods")) {
-                Some(get_modlist(mods))
+                Some(get_modlist(mods, matches.is_present("modversions")))
             } else {
                 None
             },
@@ -172,12 +173,30 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     Ok(out)
 }
 
-fn get_modlist(list: ModInfo) -> String {
-    match list {
+fn get_modlist(list: ModInfo, version_info: bool) -> String {
+    let infos = match list {
         ModInfo::Forge { mod_list: l } => l,
-    }
-    .into_iter()
-    .map(|m| m.modid)
-    .intersperse("\n".to_owned())
-    .collect()
+    };
+
+    let max_width = if version_info {
+        infos
+            .iter()
+            .map(|m| m.modid.len())
+            .max()
+            .unwrap_or_default()
+    } else {
+        0
+    };
+
+    infos
+        .into_iter()
+        .map(|m| {
+            if version_info {
+                format!("{: <width$} | {}", m.modid, m.version, width = max_width)
+            } else {
+                m.modid
+            }
+        })
+        .intersperse("\n".to_owned())
+        .collect()
 }

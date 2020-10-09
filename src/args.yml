@@ -29,6 +29,10 @@ args:
     - mods:
           short: m
           help: "if supplied, a mod list will be printed"
+    - modversions:
+          short: v
+          help: "if supplied, mods will also have their version info printed"
+          requires: "mods"
 
     # IMAGE ARGS
     # TODO due to a bug in clap, the image argument is always required because size has a default value
