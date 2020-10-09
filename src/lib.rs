@@ -2,12 +2,12 @@ use asciify::AsciiBuilder;
 
 /// prints a table with the entries supplied
 /// the identifier at the start of each entry sets the type
-/// 
+///
 /// l = list entry
 /// b = block
 /// lo = list entry option
 /// bo = block option
-/// 
+///
 /// options are checked if they are `Some` and won't be printed if they aren't
 #[macro_export]
 macro_rules! print_table {
@@ -42,7 +42,8 @@ macro_rules! print_table {
 
 /// returns an `Option` of the expression passed in
 /// `None` if the `is_empty` on the expression returns true, `Some(x)` otherwise
-/// this is a macro and not a function because `is_empty` is not defined in any trait
+/// this is a macro and not a function because `is_empty` is not defined in any
+/// trait
 #[macro_export]
 macro_rules! none_if_empty {
     ($x:expr) => {

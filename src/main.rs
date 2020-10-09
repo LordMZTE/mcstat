@@ -11,7 +11,7 @@ use tokio::time;
 
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
-use async_minecraft_ping::{ConnectionConfig, ModInfo, ServerDescription};
+use async_minecraft_ping::{ConnectionConfig, ModInfo, ServerDescription, StatusResponse};
 use clap::App;
 use image::ImageFormat;
 use itertools::Itertools;
@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     let yaml = load_yaml!("args.yml");
     let matches = App::from_yaml(yaml).get_matches();
 
-    //region Network
+    // region Network
     let config = ConnectionConfig::build(
         matches
             .value_of("ip")
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
             .context("invalid protocol version")?,
     );
 
-    //create timeout for server connection
+    // create timeout for server connection
     let mut timeout = time::delay_for(Duration::from_millis(
         matches
             .value_of("timeout")
@@ -63,16 +63,23 @@ async fn main() -> Result<()> {
             .context("timeout is invalid value")?,
     ));
 
-    let (response, raw_response) = tokio::select! {
+    let raw_response = tokio::select! {
         _ = &mut timeout => Err(anyhow!("Connection to server timed out")),
         r = async {
             let mut con = config.connect().await?;
-            con.status().await
+            con.status_raw().await
         } => r,
     }?;
-    //endregion
 
-    //region Image
+    if matches.is_present("raw") {
+        println!("{}", raw_response);
+        return Ok(());
+    }
+
+    let response = serde_json::from_str::<StatusResponse>(&raw_response)?;
+    // endregion
+
+    // region Image
     let image_size: u32 = matches
         .value_of("size")
         .context("failed to get value from args")?
@@ -81,7 +88,7 @@ async fn main() -> Result<()> {
     let mut image = None;
 
     if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
-        //The image parsing and asciifying is done while the table is printing
+        // The image parsing and asciifying is done while the table is printing
         image = Some(tokio::spawn(asciify_base64_image(
             favicon,
             AsciiConfig {
@@ -92,9 +99,9 @@ async fn main() -> Result<()> {
             },
         )));
     }
-    //endregion
+    // endregion
 
-    //region printing
+    // region printing
     let player_sample = response
         .players
         .sample
@@ -106,7 +113,6 @@ async fn main() -> Result<()> {
 
     print_table! {
         40;
-        bo "Raw Json" => if matches.is_present("raw") {Some(raw_response)} else {None},
         bo "Description" => none_if_empty!(remove_formatting(&response.description.get_text())),
         bo "Extra Description" => {
             if let ServerDescription::Big(big_desc) = response.description {
@@ -135,7 +141,7 @@ async fn main() -> Result<()> {
     if let Some(img) = image {
         println!("\n{}", img.await??);
     }
-    //endregion
+    // endregion
     Ok(())
 }
 
@@ -149,7 +155,8 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     let builder = config.apply(AsciiBuilder::new_from_image(image));
 
     let mut buf = if config.colored {
-        //this does not write to stdout but just gets the correct color information for stdout
+        // this does not write to stdout but just gets the correct color
+        // information for stdout
         let mut buf = BufferWriter::stdout(ColorChoice::Always).buffer();
         builder.to_stream_colored(&mut buf);
         buf
@@ -158,16 +165,16 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
         builder.to_stream(&mut buf);
         buf
     };
-    //reset color
+    // reset color
     buf.reset()?;
 
     let bytes = buf.as_slice().to_vec();
 
-    //only check utf8 format in debug mode
+    // only check utf8 format in debug mode
     #[cfg(debug_assertions)]
     let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
     #[cfg(not(debug_assertions))]
-    //bytes should always be valid utf8
+    // bytes should always be valid utf8
     let out = unsafe { String::from_utf8_unchecked(bytes) };
 
     Ok(out)
