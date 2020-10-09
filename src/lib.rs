@@ -18,7 +18,7 @@ macro_rules! print_table {
 
     //block
     (b $l:expr => $k:expr) => {
-        println!("{:=^25}\n{}\n=========================\n", $l, $k);
+        println!("{:=^25}\n{}\n=========================", $l, $k);
     };
 
     //list entry option
@@ -31,7 +31,7 @@ macro_rules! print_table {
     //block option
     (bo $l:expr => $k:expr) => {
         if let Some(txt) = $k {
-            println!("{:=^25}\n{}\n=========================\n", $l, txt);
+            println!("{:=^25}\n{}\n=========================", $l, txt);
         }
     };
 

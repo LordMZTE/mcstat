@@ -11,7 +11,7 @@ use tokio::time;
 
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
-use async_minecraft_ping::ConnectionConfig;
+use async_minecraft_ping::{ConnectionConfig, ModInfo, ServerDescription};
 use clap::App;
 use image::ImageFormat;
 use itertools::Itertools;
@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
             .context("timeout is invalid value")?,
     ));
 
-    let response = tokio::select! {
+    let (response, raw_response) = tokio::select! {
         _ = &mut timeout => Err(anyhow!("Connection to server timed out")),
         r = async {
             let mut con = config.connect().await?;
@@ -105,11 +105,29 @@ async fn main() -> Result<()> {
         .collect::<String>();
 
     print_table! {
-        bo "Description" => none_if_empty!(remove_formatting(&response.description.text)),
+        bo "Raw Json" => if matches.is_present("raw") {Some(raw_response)} else {None},
+        bo "Description" => none_if_empty!(remove_formatting(&response.description.get_text())),
+        bo "Extra Description" => {
+            if let ServerDescription::Big(big_desc) = response.description {
+                let desc = big_desc.extra;
+                if desc.is_empty() {
+                    None
+                 } else {
+                    Some(desc.into_iter().map(|p| p.text).collect::<String>())
+               }
+            } else {
+                None
+            }
+        },
         bo "Player Sample" => none_if_empty!(remove_formatting(&player_sample)),
         lo "Server Version" => none_if_empty!(remove_formatting(&response.version.name)),
         l "Online Players" => response.players.online,
         l "Max Players" => response.players.max,
+        bo "Mods" => if let (Some(mods), true) = (response.modinfo, matches.is_present("mods")) {
+                Some(get_modlist(mods))
+            } else {
+                None
+            },
         l "Server Protocol" => response.version.protocol,
     };
 
@@ -152,4 +170,14 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     let out = unsafe { String::from_utf8_unchecked(bytes) };
 
     Ok(out)
+}
+
+fn get_modlist(list: ModInfo) -> String {
+    match list {
+        ModInfo::Forge { mod_list: l } => l,
+    }
+    .into_iter()
+    .map(|m| m.modid)
+    .intersperse("\n".to_owned())
+    .collect()
 }

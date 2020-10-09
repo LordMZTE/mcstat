@@ -9,4 +9,4 @@
 - favicon shown as ascii art
 ## TODO
 ---
-- [ ] fork async-minecraft-ping in order to fix some bugs and implement mod list response (dev is not responding to [issue](https://github.com/jsvana/async-minecraft-ping/issues/3))
+- [x] fork async-minecraft-ping in order to fix some bugs and implement mod list response (dev is not responding to [issue](https://github.com/jsvana/async-minecraft-ping/issues/3))
