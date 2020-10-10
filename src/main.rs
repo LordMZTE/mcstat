@@ -18,6 +18,7 @@ use itertools::Itertools;
 use mcstat::{remove_formatting, AsciiConfig};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
+/// this message is used if getting a value from the arguments fails
 const ARGUMENT_FAIL_MESSAGE: &str = "failed to get value from args";
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -38,10 +39,12 @@ async fn main() -> Result<()> {
             .parse()
             .context("invalid port")
             .and_then(|p| {
-                if p > 0 && p < u16::MAX {
+                // the port must be above 0
+                if p > 0 {
                     Ok(p)
                 } else {
-                    Err(anyhow!(ARGUMENT_FAIL_MESSAGE))
+                    // this error will be overriden anyways
+                    Err(anyhow!(""))
                 }
             })
             .context("invalid port")?,
@@ -102,6 +105,12 @@ async fn main() -> Result<()> {
     // endregion
 
     // region printing
+    // if the server has mods, and the user hasn't used the -m argument, notify
+    // that.
+    if let (false, Some(_)) = (matches.is_present("mods"), &response.modinfo) {
+        println!("This server has mods. To show them use the -m argument\n")
+    }
+
     let player_sample = response
         .players
         .sample
@@ -119,7 +128,7 @@ async fn main() -> Result<()> {
                 let desc = big_desc.extra;
                 if desc.is_empty() {
                     None
-                 } else {
+                } else {
                     Some(desc.into_iter().map(|p| p.text).collect::<String>())
                }
             } else {
@@ -149,6 +158,9 @@ async fn main() -> Result<()> {
 /// returns Err if the base64 image is invalid
 async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<String> {
     let img = image_base64::from_base64(favicon);
+    // TODO for some reason, image_base64 returns the format as string (and using
+    // regex!) which is useless and also inefficient, so Png is temporarily
+    // hardcoded. we should probably stop using this library
     let image =
         image::load(Cursor::new(img), ImageFormat::Png).context("image has invalid format")?;
 
@@ -173,18 +185,23 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     // only check utf8 format in debug mode
     #[cfg(debug_assertions)]
     let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
-    #[cfg(not(debug_assertions))]
     // bytes should always be valid utf8
+    #[cfg(not(debug_assertions))]
     let out = unsafe { String::from_utf8_unchecked(bytes) };
 
     Ok(out)
 }
 
+/// formats a ModInfo to a readable list of mods
+///
+/// if `version_info`, the version of the mods will also be displayed
 fn get_modlist(list: ModInfo, version_info: bool) -> String {
     let infos = match list {
         ModInfo::Forge { mod_list: l } => l,
     };
 
+    // the width at which | characters should be placed this is the length of the
+    // longest modid
     let max_width = if version_info {
         infos
             .iter()
@@ -192,10 +209,13 @@ fn get_modlist(list: ModInfo, version_info: bool) -> String {
             .max()
             .unwrap_or_default()
     } else {
+        // this will not be used in case version_info is off so we just use 0
         0
     };
 
     infos
+        // we use into_iter instead of iter because a String cannot be collected from &String
+        // and since we don't need infos again
         .into_iter()
         .map(|m| {
             if version_info {
