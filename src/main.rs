@@ -11,11 +11,11 @@ use tokio::time;
 
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
-use async_minecraft_ping::{ConnectionConfig, ModInfo, ServerDescription, StatusResponse};
+use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 use clap::App;
 use image::ImageFormat;
 use itertools::Itertools;
-use mcstat::{remove_formatting, AsciiConfig};
+use mcstat::{remove_formatting, AsciiConfig, get_table};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
 /// this message is used if getting a value from the arguments fails
@@ -90,10 +90,10 @@ async fn main() -> Result<()> {
         .context("image size must be number")?;
     let mut image = None;
 
-    if let (Some(favicon), true) = (response.favicon, matches.is_present("image")) {
+    if let (Some(favicon), true) = (&response.favicon, matches.is_present("image")) {
         // The image parsing and asciifying is done while the table is printing
         image = Some(tokio::spawn(asciify_base64_image(
-            favicon,
+            favicon.clone(),
             AsciiConfig {
                 size: Some(image_size),
                 colored: matches.is_present("color"),
@@ -114,7 +114,8 @@ async fn main() -> Result<()> {
     let player_sample = response
         .players
         .sample
-        .unwrap_or_default()
+        .as_ref()
+        .unwrap_or(&vec![])
         .iter()
         .map(|p| p.name.as_str())
         .intersperse("\n")
@@ -124,12 +125,12 @@ async fn main() -> Result<()> {
         40;
         bo "Description" => none_if_empty!(remove_formatting(&response.description.get_text())),
         bo "Extra Description" => {
-            if let ServerDescription::Big(big_desc) = response.description {
-                let desc = big_desc.extra;
+            if let ServerDescription::Big(big_desc) = &response.description {
+                let desc = &big_desc.extra;
                 if desc.is_empty() {
                     None
                 } else {
-                    Some(desc.into_iter().map(|p| p.text).collect::<String>())
+                    Some(desc.into_iter().map(|p| p.text.clone()).collect::<String>())
                }
             } else {
                 None
@@ -137,14 +138,31 @@ async fn main() -> Result<()> {
         },
         bo "Player Sample" => none_if_empty!(remove_formatting(&player_sample)),
         lo "Server Version" => none_if_empty!(remove_formatting(&response.version.name)),
-        l "Online Players" => response.players.online,
-        l "Max Players" => response.players.max,
-        bo "Mods" => if let (Some(mods), true) = (response.modinfo, matches.is_present("mods")) {
-                Some(get_modlist(mods, matches.is_present("modversions")))
+        l "Online Players" => &response.players.online,
+        l "Max Players" => &response.players.max,
+        bo "Mods" => if let (Some(mod_list), true) = (response.forge_mod_info(), matches.is_present("mods")) {
+                Some(get_table(
+                    mod_list
+                        .iter()
+                        .sorted_by(|a, b| a.modid.cmp(&b.modid))
+                        .map(|m| (&*m.modid, &*m.version)),
+                    matches.is_present("modversions")
+                ))
             } else {
                 None
             },
-        l "Server Protocol" => response.version.protocol,
+        l "Server Protocol" => &response.version.protocol,
+        bo "Forge Channels" => if let (true, Some(fd)) = (matches.is_present("channels"), response.forge_data) {
+            Some(get_table(
+                fd.channels
+                    .iter()
+                    .sorted_by(|a, b| a.res.cmp(&b.res))
+                    .map(|c| (&*c.res, &*c.version)),
+                true
+            ))
+        } else {
+            None
+        }
     };
 
     if let Some(img) = image {
@@ -190,40 +208,4 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     let out = unsafe { String::from_utf8_unchecked(bytes) };
 
     Ok(out)
-}
-
-/// formats a ModInfo to a readable list of mods
-///
-/// if `version_info`, the version of the mods will also be displayed
-fn get_modlist(list: ModInfo, version_info: bool) -> String {
-    let infos = match list {
-        ModInfo::Forge { mod_list: l } => l,
-    };
-
-    // the width at which | characters should be placed this is the length of the
-    // longest modid
-    let max_width = if version_info {
-        infos
-            .iter()
-            .map(|m| m.modid.len())
-            .max()
-            .unwrap_or_default()
-    } else {
-        // this will not be used in case version_info is off so we just use 0
-        0
-    };
-
-    infos
-        // we use into_iter instead of iter because a String cannot be collected from &String
-        // and since we don't need infos again
-        .into_iter()
-        .map(|m| {
-            if version_info {
-                format!("{: <width$} | {}", m.modid, m.version, width = max_width)
-            } else {
-                m.modid
-            }
-        })
-        .intersperse("\n".to_owned())
-        .collect()
 }

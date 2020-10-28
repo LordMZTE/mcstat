@@ -1,4 +1,5 @@
 use asciify::AsciiBuilder;
+use itertools::Itertools;
 
 /// prints a table with the entries supplied
 /// the identifier at the start of each entry sets the type
@@ -83,4 +84,32 @@ pub fn remove_formatting(s: &str) -> String {
         }
     }
     buf
+}
+
+/// formats a iterator to a readable list
+///
+/// if `second_column`, the right strings will also be displayed
+pub fn get_table<'a>(
+    entries: impl Iterator<Item = (&'a str, &'a str)> + Clone,
+    second_column: bool,
+) -> String {
+    // the width at which | characters should be placed this is the length of the
+    // longest entry
+    let max_width = if second_column {
+        entries.clone().map(|m| m.0.len()).max().unwrap_or_default()
+    } else {
+        // this will not be used in case second_column is off so we just use 0
+        0
+    };
+
+    entries
+        .map(|m| {
+            if second_column {
+                format!("{: <width$} | {}", m.0, m.1, width = max_width)
+            } else {
+                m.0.to_owned()
+            }
+        })
+        .intersperse("\n".to_owned())
+        .collect()
 }
