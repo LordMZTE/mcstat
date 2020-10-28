@@ -1,21 +1,14 @@
-#[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate mcstat;
-#[macro_use]
-extern crate anyhow;
-
 use std::io::Cursor;
 use time::Duration;
 use tokio::time;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use asciify::AsciiBuilder;
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
-use clap::App;
+use clap::{App, load_yaml};
 use image::ImageFormat;
 use itertools::Itertools;
-use mcstat::{remove_formatting, AsciiConfig, get_table};
+use mcstat::{AsciiConfig, get_table, none_if_empty, print_table, remove_formatting};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
 /// this message is used if getting a value from the arguments fails
