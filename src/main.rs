@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
     // region printing
     // if the server has mods, and the user hasn't used the -m argument, notify
     // that.
-    if let (false, Some(_)) = (matches.is_present("mods"), &response.modinfo) {
+    if let (false, Some(_)) = (matches.is_present("mods"), response.forge_mod_info()) {
         println!("This server has mods. To show them use the -m argument\n")
     }
 
