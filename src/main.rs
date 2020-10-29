@@ -2,13 +2,13 @@ use std::io::Cursor;
 use time::Duration;
 use tokio::time;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use asciify::AsciiBuilder;
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
-use clap::{App, load_yaml};
+use clap::{load_yaml, App};
 use image::ImageFormat;
 use itertools::Itertools;
-use mcstat::{AsciiConfig, get_table, none_if_empty, print_table, remove_formatting};
+use mcstat::{get_table, none_if_empty, print_table, remove_formatting, AsciiConfig};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
 /// this message is used if getting a value from the arguments fails
@@ -19,36 +19,25 @@ async fn main() -> Result<()> {
     let matches = App::from_yaml(yaml).get_matches();
 
     // region Network
-    let config = ConnectionConfig::build(
-        matches
-            .value_of("ip")
-            .context(ARGUMENT_FAIL_MESSAGE)?
-            .to_owned(),
-    )
-    .with_port(
-        matches
-            .value_of("port")
-            .context(ARGUMENT_FAIL_MESSAGE)?
-            .parse()
-            .context("invalid port")
-            .and_then(|p| {
-                // the port must be above 0
-                if p > 0 {
-                    Ok(p)
-                } else {
-                    // this error will be overriden anyways
-                    Err(anyhow!(""))
-                }
-            })
-            .context("invalid port")?,
-    )
-    .with_protocol_version(
-        matches
-            .value_of("protocol-version")
-            .context(ARGUMENT_FAIL_MESSAGE)?
-            .parse()
-            .context("invalid protocol version")?,
-    );
+    let mut ip = matches
+        .value_of("ip")
+        .context(ARGUMENT_FAIL_MESSAGE)?
+        .splitn(2, ':');
+
+    let config = ConnectionConfig::build(ip.next().context("invalid ip")?.to_owned())
+        .with_port(
+            ip.next()
+                .map_or(Err(()), |p| p.parse::<u16>().map_err(|_| ()))
+                .and_then(|p| if p > 0 { Ok(p) } else { Err(()) })
+                .unwrap_or(25565),
+        )
+        .with_protocol_version(
+            matches
+                .value_of("protocol-version")
+                .context(ARGUMENT_FAIL_MESSAGE)?
+                .parse()
+                .context("invalid protocol version")?,
+        );
 
     // create timeout for server connection
     let mut timeout = time::delay_for(Duration::from_millis(
