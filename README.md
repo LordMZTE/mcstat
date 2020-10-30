@@ -8,6 +8,7 @@
 - description
 - favicon shown as ascii art
 - mod list (for forge servers)
+- forge channels
 - raw json response output
 ## TODO
 ---
