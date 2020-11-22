@@ -1,45 +1,7 @@
 use asciify::AsciiBuilder;
 use itertools::Itertools;
 
-/// prints a table with the entries supplied
-/// the identifier at the start of each entry sets the type
-///
-/// l = list entry
-/// b = block
-/// lo = list entry option
-/// bo = block option
-///
-/// options are checked if they are `Some` and won't be printed if they aren't
-#[macro_export]
-macro_rules! print_table {
-    //list entry
-    ($width:expr; l $l:expr => $k:expr) => {
-        println!("{: <width$} | {}", $l, $k, width = $width);
-    };
-
-    //block
-    ($width:expr; b $l:expr => $k:expr) => {
-        println!("{:=^width$}\n{}\n{:=<width$}", $l, $k, "", width = $width);
-    };
-
-    //list entry option
-    ($width:expr; lo $l:expr => $k:expr) => {
-        if let Some(txt) = $k {
-            println!("{: <width$} | {}", $l, txt, width = $width);
-        }
-    };
-
-    //block option
-    ($width:expr; bo $l:expr => $k:expr) => {
-        if let Some(txt) = $k {
-            println!("{:=^width$}\n{}\n{:=<width$}", $l, txt, "", width = $width);
-        }
-    };
-
-    ($width:expr; $($t:tt $l:expr => $k:expr),+ $(,)?) => {
-        $(print_table!($width; $t $l => $k);)*
-    };
-}
+pub mod output;
 
 /// returns an `Option` of the expression passed in
 /// `None` if the `is_empty` on the expression returns true, `Some(x)` otherwise

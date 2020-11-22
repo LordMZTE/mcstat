@@ -8,7 +8,7 @@ use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 use clap::{load_yaml, App};
 use image::ImageFormat;
 use itertools::Itertools;
-use mcstat::{get_table, none_if_empty, print_table, remove_formatting, AsciiConfig};
+use mcstat::{get_table, none_if_empty, output::Table, remove_formatting, AsciiConfig};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 
 /// this message is used if getting a value from the arguments fails
@@ -103,49 +103,69 @@ async fn main() -> Result<()> {
         .intersperse("\n")
         .collect::<String>();
 
-    print_table! {
-        40;
-        bo "Description" => none_if_empty!(remove_formatting(&response.description.get_text())),
-        bo "Extra Description" => {
-            if let ServerDescription::Big(big_desc) = &response.description {
-                let desc = &big_desc.extra;
-                if desc.is_empty() {
-                    None
-                } else {
-                    Some(desc.into_iter().map(|p| p.text.clone()).collect::<String>())
-               }
-            } else {
+    let mut table = Table::new();
+
+    table.opt_big_entry(
+        "Description",
+        none_if_empty!(remove_formatting(&response.description.get_text())),
+    );
+
+    table.opt_big_entry("Extra Description", {
+        if let ServerDescription::Big(big_desc) = &response.description {
+            let desc = &big_desc.extra;
+            if desc.is_empty() {
                 None
+            } else {
+                Some(desc.into_iter().map(|p| p.text.clone()).collect::<String>())
             }
+        } else {
+            None
+        }
+    });
+
+    table.opt_big_entry(
+        "Player Sample",
+        none_if_empty!(remove_formatting(&player_sample)),
+    );
+
+    table.opt_small_entry(
+        "Server Version",
+        none_if_empty!(remove_formatting(&response.version.name)),
+    );
+    table.small_entry("Online Players", &response.players.online);
+    table.small_entry("Max Players", &response.players.max);
+
+    table.opt_big_entry(
+        "Mods",
+        if let (Some(mod_list), true) = (response.forge_mod_info(), matches.is_present("mods")) {
+            Some(get_table(
+                mod_list
+                    .iter()
+                    .sorted_by(|a, b| a.modid.cmp(&b.modid))
+                    .map(|m| (&*m.modid, &*m.version)),
+                matches.is_present("modversions"),
+            ))
+        } else {
+            None
         },
-        bo "Player Sample" => none_if_empty!(remove_formatting(&player_sample)),
-        lo "Server Version" => none_if_empty!(remove_formatting(&response.version.name)),
-        l "Online Players" => &response.players.online,
-        l "Max Players" => &response.players.max,
-        bo "Mods" => if let (Some(mod_list), true) = (response.forge_mod_info(), matches.is_present("mods")) {
-                Some(get_table(
-                    mod_list
-                        .iter()
-                        .sorted_by(|a, b| a.modid.cmp(&b.modid))
-                        .map(|m| (&*m.modid, &*m.version)),
-                    matches.is_present("modversions")
-                ))
-            } else {
-                None
-            },
-        l "Server Protocol" => &response.version.protocol,
-        bo "Forge Channels" => if let (true, Some(fd)) = (matches.is_present("channels"), response.forge_data) {
+    );
+
+    table.opt_big_entry(
+        "Forge Channels",
+        if let (true, Some(fd)) = (matches.is_present("channels"), response.forge_data) {
             Some(get_table(
                 fd.channels
                     .iter()
                     .sorted_by(|a, b| a.res.cmp(&b.res))
                     .map(|c| (&*c.res, &*c.version)),
-                true
+                true,
             ))
         } else {
             None
-        }
-    };
+        },
+    );
+
+    table.stdout()?;
 
     if let Some(img) = image {
         println!("\n{}", img.await??);
