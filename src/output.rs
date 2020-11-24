@@ -1,4 +1,7 @@
-use std::{io::{self, Write}, cmp::{min, max}};
+use std::{
+    cmp::{max, min},
+    io::{self, Write},
+};
 
 #[derive(SmartDefault)]
 pub struct Table {
@@ -55,9 +58,9 @@ impl Table {
     }
 
     pub fn opt_big_entry(&mut self, name: impl ToString, val: Option<impl ToString>) {
-        self.entries.push(Box::new(OptBigTableEntry(
-            val.map(|t| BigTableEntry::new(name.to_string(), t.to_string(), self.max_block_width)),
-        )));
+        self.entries.push(Box::new(OptBigTableEntry(val.map(|t| {
+            BigTableEntry::new(name.to_string(), t.to_string(), self.max_block_width)
+        }))));
     }
 
     fn set_small_width(&mut self, width: usize) {
@@ -107,7 +110,10 @@ impl TableEntry for BigTableEntry {
 impl BigTableEntry {
     pub fn new(name: String, val: String, maxwidth: usize) -> Self {
         let val_width = min(
-            val.lines().map(|s| s.len() + 4).max().unwrap_or_default(),
+            max(
+                val.lines().map(|s| s.len() + 4).max().unwrap_or_default(),
+                name.len() + 4,
+            ),
             maxwidth,
         );
 
