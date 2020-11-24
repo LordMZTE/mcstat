@@ -1,12 +1,11 @@
-use std::{
-    cmp::max,
-    io::{self, Write},
-};
+use std::{io::{self, Write}, cmp::{min, max}};
 
-#[derive(Default)]
+#[derive(SmartDefault)]
 pub struct Table {
     pub entries: Vec<Box<dyn TableEntry>>,
     pub small_entry_width: usize,
+    #[default(usize::MAX)]
+    pub max_block_width: usize,
 }
 
 impl Table {
@@ -38,6 +37,7 @@ impl Table {
         self.entries.push(Box::new(BigTableEntry::new(
             name.to_string(),
             val.to_string(),
+            self.max_block_width,
         )));
     }
 
@@ -52,7 +52,7 @@ impl Table {
 
     pub fn opt_big_entry(&mut self, name: impl ToString, val: Option<impl ToString>) {
         self.entries.push(Box::new(OptBigTableEntry(
-            val.map(|t| BigTableEntry::new(name.to_string(), t.to_string())),
+            val.map(|t| BigTableEntry::new(name.to_string(), t.to_string(), self.max_block_width)),
         )));
     }
 
@@ -101,8 +101,11 @@ impl TableEntry for BigTableEntry {
 }
 
 impl BigTableEntry {
-    pub fn new(name: String, val: String) -> Self {
-        let val_width = val.splitn(2, '\n').next().unwrap_or(&val).len();
+    pub fn new(name: String, val: String, maxwidth: usize) -> Self {
+        let val_width = min(
+            val.lines().map(|s| s.len() + 4).max().unwrap_or_default(),
+            maxwidth,
+        );
 
         Self {
             width: max(name.len(), val_width),

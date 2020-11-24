@@ -105,6 +105,10 @@ async fn main() -> Result<()> {
 
     let mut table = Table::new();
 
+    if let Some((w, _)) = term_size::dimensions() {
+        table.max_block_width = w;
+    }
+
     table.opt_big_entry(
         "Description",
         none_if_empty!(remove_formatting(&response.description.get_text())),

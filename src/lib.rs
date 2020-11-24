@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate smart_default;
+
 use asciify::AsciiBuilder;
 use itertools::Itertools;
 
