@@ -132,12 +132,17 @@ async fn main() -> Result<()> {
         none_if_empty!(remove_formatting(&player_sample)),
     );
 
+    table.blank();
+
     table.opt_small_entry(
         "Server Version",
         none_if_empty!(remove_formatting(&response.version.name)),
     );
     table.small_entry("Online Players", &response.players.online);
     table.small_entry("Max Players", &response.players.max);
+    table.small_entry("Protocol Version", &response.version.protocol);
+
+    table.blank();
 
     table.opt_big_entry(
         "Mods",

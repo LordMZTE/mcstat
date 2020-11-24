@@ -25,6 +25,10 @@ impl Table {
         Default::default()
     }
 
+    pub fn blank(&mut self) {
+        self.entries.push(Box::new(BlankTableEntry));
+    }
+
     pub fn small_entry(&mut self, name: impl ToString, val: impl ToString) {
         let name = name.to_string();
         self.set_small_width(name.len());
@@ -136,5 +140,13 @@ impl TableEntry for OptBigTableEntry {
         } else {
             Ok(())
         }
+    }
+}
+
+pub struct BlankTableEntry;
+
+impl TableEntry for BlankTableEntry {
+    fn print(&self, out: &mut dyn Write, _: &Table) -> io::Result<()> {
+        out.write(b"\n").map(|_| ())
     }
 }
