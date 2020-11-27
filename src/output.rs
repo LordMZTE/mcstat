@@ -111,7 +111,7 @@ impl BigTableEntry {
     pub fn new(name: String, val: String, maxwidth: usize) -> Self {
         let val_width = min(
             max(
-                val.lines().map(|s| s.len() + 4).max().unwrap_or_default(),
+                val.lines().map(|s| s.len()).max().unwrap_or_default(),
                 name.len() + 4,
             ),
             maxwidth,
