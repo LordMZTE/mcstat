@@ -2,6 +2,7 @@ use std::{
     cmp::{max, min},
     io::{self, Write},
 };
+use unicode_width::UnicodeWidthStr;
 
 #[derive(SmartDefault)]
 pub struct Table {
@@ -34,7 +35,7 @@ impl Table {
 
     pub fn small_entry(&mut self, name: impl ToString, val: impl ToString) {
         let name = name.to_string();
-        self.set_small_width(name.len());
+        self.set_small_width(name.width());
 
         self.entries
             .push(Box::new(SmallTableEntry(name, val.to_string())));
@@ -46,21 +47,6 @@ impl Table {
             val.to_string(),
             self.max_block_width,
         )));
-    }
-
-    pub fn opt_small_entry(&mut self, name: impl ToString, val: Option<impl ToString>) {
-        let name = name.to_string();
-        self.set_small_width(name.len());
-
-        self.entries.push(Box::new(OptSmallTableEntry(
-            val.map(|t| SmallTableEntry(name, t.to_string())),
-        )));
-    }
-
-    pub fn opt_big_entry(&mut self, name: impl ToString, val: Option<impl ToString>) {
-        self.entries.push(Box::new(OptBigTableEntry(val.map(|t| {
-            BigTableEntry::new(name.to_string(), t.to_string(), self.max_block_width)
-        }))));
     }
 
     fn set_small_width(&mut self, width: usize) {
@@ -111,40 +97,16 @@ impl BigTableEntry {
     pub fn new(name: String, val: String, maxwidth: usize) -> Self {
         let val_width = min(
             max(
-                val.lines().map(|s| s.len()).max().unwrap_or_default(),
-                name.len() + 4,
+                val.lines().map(|s| s.width()).max().unwrap_or_default(),
+                name.width() + 4,
             ),
             maxwidth,
         );
 
         Self {
-            width: max(name.len(), val_width),
+            width: max(name.width(), val_width),
             name,
             val,
-        }
-    }
-}
-
-pub struct OptSmallTableEntry(Option<SmallTableEntry>);
-
-impl TableEntry for OptSmallTableEntry {
-    fn print(&self, out: &mut dyn Write, table: &Table) -> io::Result<()> {
-        if let Some(entry) = &self.0 {
-            entry.print(out, table)
-        } else {
-            Ok(())
-        }
-    }
-}
-
-pub struct OptBigTableEntry(Option<BigTableEntry>);
-
-impl TableEntry for OptBigTableEntry {
-    fn print(&self, out: &mut dyn Write, table: &Table) -> io::Result<()> {
-        if let Some(entry) = &self.0 {
-            entry.print(out, table)
-        } else {
-            Ok(())
         }
     }
 }

@@ -1,6 +1,4 @@
 use std::io::Cursor;
-use time::Duration;
-use tokio::time;
 
 use anyhow::{anyhow, Context, Result};
 use asciify::AsciiBuilder;
@@ -8,11 +6,15 @@ use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 use clap::{load_yaml, App};
 use image::ImageFormat;
 use itertools::Itertools;
-use mcstat::{get_table, none_if_empty, output::Table, remove_formatting, AsciiConfig};
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
+use time::Duration;
+use tokio::time;
+
+use mcstat::{get_table, none_if_empty, output::Table, remove_formatting, AsciiConfig};
 
 /// this message is used if getting a value from the arguments fails
 const ARGUMENT_FAIL_MESSAGE: &str = "failed to get value from args";
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let yaml = load_yaml!("args.yml");
@@ -93,88 +95,13 @@ async fn main() -> Result<()> {
         println!("This server has mods. To show them use the -m argument\n")
     }
 
-    let player_sample = response
-        .players
-        .sample
-        .as_ref()
-        .unwrap_or(&vec![])
-        .iter()
-        .map(|p| p.name.as_str())
-        .intersperse("\n")
-        .collect::<String>();
-
-    let mut table = Table::new();
-
-    if let Some((w, _)) = term_size::dimensions() {
-        table.max_block_width = w;
-    }
-
-    table.opt_big_entry(
-        "Description",
-        none_if_empty!(remove_formatting(&response.description.get_text())),
-    );
-
-    table.opt_big_entry("Extra Description", {
-        if let ServerDescription::Big(big_desc) = &response.description {
-            let desc = &big_desc.extra;
-            if desc.is_empty() {
-                None
-            } else {
-                Some(desc.into_iter().map(|p| p.text.clone()).collect::<String>())
-            }
-        } else {
-            None
-        }
-    });
-
-    table.opt_big_entry(
-        "Player Sample",
-        none_if_empty!(remove_formatting(&player_sample)),
-    );
-
-    table.blank();
-
-    table.opt_small_entry(
-        "Server Version",
-        none_if_empty!(remove_formatting(&response.version.name)),
-    );
-    table.small_entry("Online Players", &response.players.online);
-    table.small_entry("Max Players", &response.players.max);
-    table.small_entry("Protocol Version", &response.version.protocol);
-
-    table.blank();
-
-    table.opt_big_entry(
-        "Mods",
-        if let (Some(mod_list), true) = (response.forge_mod_info(), matches.is_present("mods")) {
-            Some(get_table(
-                mod_list
-                    .iter()
-                    .sorted_by(|a, b| a.modid.cmp(&b.modid))
-                    .map(|m| (&*m.modid, &*m.version)),
-                matches.is_present("modversions"),
-            ))
-        } else {
-            None
-        },
-    );
-
-    table.opt_big_entry(
-        "Forge Channels",
-        if let (true, Some(fd)) = (matches.is_present("channels"), response.forge_data) {
-            Some(get_table(
-                fd.channels
-                    .iter()
-                    .sorted_by(|a, b| a.res.cmp(&b.res))
-                    .map(|c| (&*c.res, &*c.version)),
-                true,
-            ))
-        } else {
-            None
-        },
-    );
-
-    table.stdout()?;
+    format_table(
+        &response,
+        matches.is_present("mods"),
+        matches.is_present("modversions"),
+        matches.is_present("channels"),
+    )
+    .stdout()?;
 
     if let Some(img) = image {
         println!("\n{}", img.await??);
@@ -219,4 +146,80 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     let out = unsafe { String::from_utf8_unchecked(bytes) };
 
     Ok(out)
+}
+
+fn format_table(response: &StatusResponse, mods: bool, modversions: bool, channels: bool) -> Table {
+    let player_sample = response
+        .players
+        .sample
+        .as_ref()
+        .unwrap_or(&vec![])
+        .iter()
+        .map(|p| p.name.as_str())
+        .intersperse("\n")
+        .collect::<String>();
+
+    let mut table = Table::new();
+
+    if let Some((w, _)) = term_size::dimensions() {
+        table.max_block_width = w;
+    }
+
+    if let Some(s) = none_if_empty!(remove_formatting(&response.description.get_text())) {
+        table.big_entry("Description", s);
+    }
+
+    if let ServerDescription::Big(big_desc) = &response.description {
+        let desc = &big_desc.extra;
+        let txt = desc.into_iter().map(|p| p.text.clone()).collect::<String>();
+        if let Some(s) = none_if_empty!(txt) {
+            table.big_entry("Extra Description", s);
+        }
+    }
+
+    if let Some(s) = none_if_empty!(remove_formatting(&player_sample)) {
+        table.big_entry("Player Sample", s);
+    }
+
+    table.blank();
+
+    if let Some(s) = none_if_empty!(remove_formatting(&response.version.name)) {
+        table.small_entry("Server Version", s);
+    }
+
+    table.small_entry("Online Players", &response.players.online);
+    table.small_entry("Max Players", &response.players.max);
+    table.small_entry("Protocol Version", &response.version.protocol);
+
+    table.blank();
+
+    if let (Some(mod_list), true) = (response.forge_mod_info(), mods) {
+        let txt = get_table(
+            mod_list
+                .iter()
+                .sorted_by(|a, b| a.modid.cmp(&b.modid))
+                .map(|m| (&*m.modid, &*m.version)),
+            modversions,
+        );
+
+        if let Some(s) = none_if_empty!(txt) {
+            table.big_entry("Mods", s);
+        }
+    }
+
+    if let (true, Some(fd)) = (channels, &response.forge_data) {
+        let txt = get_table(
+            fd.channels
+                .iter()
+                .sorted_by(|a, b| a.res.cmp(&b.res))
+                .map(|c| (&*c.res, &*c.version)),
+            true,
+        );
+
+        if let Some(s) = none_if_empty!(txt) {
+            table.big_entry("Forge Channels", s);
+        }
+    }
+
+    table
 }

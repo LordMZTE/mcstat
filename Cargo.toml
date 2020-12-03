@@ -7,15 +7,16 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "^2.33", features = ["yaml"] }
-image-base64 = "0.1.0"
-image = "0.23.9"
+anyhow = "1.0.32"
 asciify = "0.1.6"
 async-minecraft-ping = { git = "https://github.com/LordMZTE/async-minecraft-ping.git", tag = "v0.2.4" }
-tokio = { version = "0.2.22", features = ["full"] }
+clap = { version = "^2.33", features = ["yaml"] }
+image = "0.23.9"
+image-base64 = "0.1.0"
 itertools = "0.9.0"
-termcolor = "1"
-anyhow = "1.0.32"
 serde_json = "1.0.58"
-term_size = "0.3.2"
 smart-default = "0.6.0"
+term_size = "0.3.2"
+termcolor = "1"
+tokio = { version = "0.2.22", features = ["full"] }
+unicode-width = "0.1.8"

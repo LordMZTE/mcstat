@@ -3,6 +3,8 @@ extern crate smart_default;
 
 use asciify::AsciiBuilder;
 use itertools::Itertools;
+use crate::output::Table;
+use std::io::Cursor;
 
 pub mod output;
 
@@ -12,13 +14,15 @@ pub mod output;
 /// trait
 #[macro_export]
 macro_rules! none_if_empty {
-    ($x:expr) => {
-        if $x.is_empty() {
+    ($x:expr) => {{
+        // let binding to avoid copying
+        let x = $x;
+        if x.is_empty() {
             None
         } else {
-            Some($x)
+            Some(x)
         }
-    };
+    }};
 }
 
 pub struct AsciiConfig {
@@ -58,23 +62,15 @@ pub fn get_table<'a>(
     entries: impl Iterator<Item = (&'a str, &'a str)> + Clone,
     second_column: bool,
 ) -> String {
-    // the width at which | characters should be placed this is the length of the
-    // longest entry
-    let max_width = if second_column {
-        entries.clone().map(|m| m.0.len()).max().unwrap_or_default()
+    if second_column {
+        let mut table = Table::new();
+        for entry in entries {
+            table.small_entry(entry.0, entry.1);
+        }
+        let mut cursor = Cursor::new(Vec::<u8>::new());
+        table.print(&mut cursor).unwrap();
+        String::from_utf8(cursor.into_inner()).unwrap()
     } else {
-        // this will not be used in case second_column is off so we just use 0
-        0
-    };
-
-    entries
-        .map(|m| {
-            if second_column {
-                format!("{: <width$} | {}", m.0, m.1, width = max_width)
-            } else {
-                m.0.to_owned()
-            }
-        })
-        .intersperse("\n".to_owned())
-        .collect()
+        entries.map(|x| x.0).intersperse("\n").collect()
+    }
 }
