@@ -16,7 +16,7 @@ args:
           short: t
           help: "the time before the server ping times out in milliseconds"
           takes_value: true
-          default_value: "500"
+          default_value: "5000"
     - raw:
           short: r
           help: "if supplied, the raw json response from the server will be printed"
