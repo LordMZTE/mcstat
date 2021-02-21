@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate smart_default;
 
+use crate::output::Table;
 use asciify::AsciiBuilder;
 use itertools::Itertools;
-use crate::output::Table;
 use std::io::Cursor;
 
 pub mod output;

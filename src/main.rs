@@ -3,7 +3,6 @@ use std::io::Cursor;
 use anyhow::{anyhow, Context, Result};
 use asciify::AsciiBuilder;
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
-use clap::{load_yaml, App};
 use image::ImageFormat;
 use itertools::Itertools;
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
@@ -12,13 +11,14 @@ use tokio::time;
 
 use mcstat::{get_table, none_if_empty, output::Table, remove_formatting, AsciiConfig};
 
+mod cli;
+
 /// this message is used if getting a value from the arguments fails
 const ARGUMENT_FAIL_MESSAGE: &str = "failed to get value from args";
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let yaml = load_yaml!("args.yml");
-    let matches = App::from_yaml(yaml).get_matches();
+    let matches = cli::get_app().get_matches();
 
     // region Network
     let mut ip = matches
