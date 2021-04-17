@@ -6,7 +6,7 @@ use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 use image::ImageFormat;
 use itertools::Itertools;
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
-use time::Duration;
+use time::{Duration, Instant};
 use tokio::time;
 
 use mcstat::{get_table, none_if_empty, output::Table, remove_formatting, AsciiConfig};
@@ -50,11 +50,19 @@ async fn main() -> Result<()> {
             .context("timeout is invalid value")?,
     ));
 
-    let raw_response = tokio::select! {
+    let (raw_response, ping) = tokio::select! {
         _ = &mut timeout => Err(anyhow!("Connection to server timed out")),
         r = async {
+            let start_time = Instant::now();
             let mut con = config.connect().await?;
-            con.status_raw().await
+            // we end the timer here, because at this point, we've sent ONE request to the server,
+            // and we don't want to send 2, since then we get double the ping.
+            // the connect function may have some processing which may take some time, but it
+            // shouldn't make an impact at this code runs at rust speed.
+            let end_time = Instant::now();
+
+            let status = con.status_raw().await?;
+            Ok((status, end_time - start_time))
         } => r,
     }?;
 
@@ -97,6 +105,7 @@ async fn main() -> Result<()> {
 
     format_table(
         &response,
+        ping.as_millis(),
         matches.is_present("mods"),
         matches.is_present("modversions"),
         matches.is_present("channels"),
@@ -148,7 +157,13 @@ async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<St
     Ok(out)
 }
 
-fn format_table(response: &StatusResponse, mods: bool, modversions: bool, channels: bool) -> Table {
+fn format_table(
+    response: &StatusResponse,
+    ping: u128,
+    mods: bool,
+    modversions: bool,
+    channels: bool,
+) -> Table {
     let player_sample = response
         .players
         .sample
@@ -189,6 +204,7 @@ fn format_table(response: &StatusResponse, mods: bool, modversions: bool, channe
 
     table.small_entry("Online Players", &response.players.online);
     table.small_entry("Max Players", &response.players.max);
+    table.small_entry("Ping", ping);
     table.small_entry("Protocol Version", &response.version.protocol);
 
     table.blank();
