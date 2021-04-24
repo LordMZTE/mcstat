@@ -71,6 +71,8 @@ pub fn get_table<'a>(
         table.print(&mut cursor).unwrap();
         String::from_utf8(cursor.into_inner()).unwrap()
     } else {
-        entries.map(|x| x.0).intersperse("\n").collect()
+        // this syntax is used due to a nightly function which will be added to rust
+        // also called intersperse
+        Itertools::intersperse(entries.map(|x| x.0), "\n").collect()
     }
 }
