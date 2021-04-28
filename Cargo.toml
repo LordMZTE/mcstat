@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.40"
 asciify = "0.1.6"
-async-minecraft-ping = { git = "https://github.com/LordMZTE/async-minecraft-ping.git", tag = "v0.2.5" }
 clap = "2.33.3"
 image = "0.23.14"
 image-base64 = "0.1.0"
@@ -20,9 +19,16 @@ smart-default = "0.6.0"
 structopt = "0.3.21"
 term_size = "0.3.2"
 termcolor = "1.1.2"
-tokio = { version = "1.5.0", features = ["full"] }
 unicode-width = "0.1.8"
 yaml-rust = "0.4.5"
+
+[dependencies.async-minecraft-ping]
+git = "https://github.com/LordMZTE/async-minecraft-ping.git"
+tag = "v0.2.5"
+
+[dependencies.tokio]
+version = "1.5.0"
+features = ["rt-multi-thread", "macros", "time"]
 
 [build-dependencies]
 clap = "2.33.3"
