@@ -1,16 +1,21 @@
-use std::io::Cursor;
-
 use anyhow::{Context, Result};
 use asciify::AsciiBuilder;
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
-use image::ImageFormat;
+
 use itertools::Itertools;
 use structopt::StructOpt;
 use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 use time::{Duration, Instant};
 use tokio::time;
 
-use mcstat::{get_table, none_if_empty, output::Table, remove_formatting, AsciiConfig};
+use mcstat::{
+    get_table,
+    none_if_empty,
+    output::Table,
+    parse_base64_image,
+    remove_formatting,
+    AsciiConfig,
+};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -46,7 +51,12 @@ struct Opt {
     #[structopt(long, short, help = "print mod list")]
     mods: bool,
 
-    #[structopt(long, short = "v", requires = "mods", help = "also prints mod versions")]
+    #[structopt(
+        long,
+        short = "v",
+        requires = "mods",
+        help = "also prints mod versions"
+    )]
     modversions: bool,
 
     #[structopt(long, help = "displays forge mod channels if the server sends them")]
@@ -74,7 +84,12 @@ struct Opt {
     )]
     deep: bool,
 
-    #[structopt(long, short = "n", requires = "image", help = "inverts ascii art favicon")]
+    #[structopt(
+        long,
+        short = "n",
+        requires = "image",
+        help = "inverts ascii art favicon"
+    )]
     invert: bool,
 }
 
@@ -94,17 +109,20 @@ async fn main() -> Result<()> {
 
     // create timeout for server connection
     let (raw_response, ping) = time::timeout(Duration::from_millis(opt.timeout), async {
-            let start_time = Instant::now();
-            let mut con = config.connect().await?;
-            // we end the timer here, because at this point, we've sent ONE request to the server,
-            // and we don't want to send 2, since then we get double the ping.
-            // the connect function may have some processing which may take some time, but it
-            // shouldn't make an impact at this code runs at rust speed.
-            let end_time = Instant::now();
+        let start_time = Instant::now();
+        let mut con = config.connect().await?;
+        // we end the timer here, because at this point, we've sent ONE request to the
+        // server, and we don't want to send 2, since then we get double the
+        // ping. the connect function may have some processing which may take
+        // some time, but it shouldn't make an impact at this code runs at rust
+        // speed.
+        let end_time = Instant::now();
 
-            let status = con.status_raw().await?;
-            Result::<_, anyhow::Error>::Ok((status, end_time - start_time))
-    }).await.context("Connection to server timed out.")??;
+        let status = con.status_raw().await?;
+        Result::<_, anyhow::Error>::Ok((status, end_time - start_time))
+    })
+    .await
+    .context("Connection to server timed out.")??;
 
     if opt.raw {
         println!("{}", raw_response);
@@ -157,12 +175,7 @@ async fn main() -> Result<()> {
 /// returns the asciifyed image from base64
 /// returns Err if the base64 image is invalid
 async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<String> {
-    let img = image_base64::from_base64(favicon);
-    // TODO for some reason, image_base64 returns the format as string (and using
-    // regex!) which is useless and also inefficient, so Png is temporarily
-    // hardcoded. we should probably stop using this library
-    let image =
-        image::load(Cursor::new(img), ImageFormat::Png).context("image has invalid format")?;
+    let image = parse_base64_image(favicon)?;
 
     let builder = config.apply(AsciiBuilder::new_from_image(image));
 

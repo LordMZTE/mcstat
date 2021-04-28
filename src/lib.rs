@@ -2,7 +2,9 @@
 extern crate smart_default;
 
 use crate::output::Table;
+use anyhow::{anyhow, bail, Context};
 use asciify::AsciiBuilder;
+use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
 use std::io::Cursor;
 
@@ -75,4 +77,31 @@ pub fn get_table<'a>(
         // also called intersperse
         Itertools::intersperse(entries.map(|x| x.0), "\n").collect()
     }
+}
+
+/// parses a base64 formatted image
+pub fn parse_base64_image(data: String) -> anyhow::Result<DynamicImage> {
+    let (header, data) = data
+        .split_once(",")
+        .context("Couldn't parse base64 image due to missing format header.")?;
+    let (data_type, image_format) = header
+        .split_once("/")
+        .context("Failed to parse base64 image, header has invalid format.")?;
+    let image_format = image_format
+        .split(";")
+        .next()
+        .context("Failed to parse base64 image, header has invalid format.")?;
+
+    if data_type != "data:image" {
+        bail!("base64 image is not an image! Has type {}", data_type);
+    }
+
+    let format = ImageFormat::from_extension(image_format).context(format!(
+        "Failed to parse base64 image due to unknown image type: {}",
+        image_format
+    ))?;
+    let data =
+        base64::decode(data).map_err(|e| anyhow!("Failed to decode base64 image data: {}", e))?;
+    image::load(Cursor::new(data), format)
+        .map_err(|e| anyhow!("Failed to load base64 image: {}", e))
 }
