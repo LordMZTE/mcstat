@@ -3,7 +3,6 @@ extern crate smart_default;
 
 use crate::output::Table;
 use anyhow::{anyhow, bail, Context};
-use asciify::AsciiBuilder;
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
 use std::io::Cursor;
@@ -25,22 +24,6 @@ macro_rules! none_if_empty {
             Some(x)
         }
     }};
-}
-
-pub struct AsciiConfig {
-    pub size: Option<u32>,
-    pub colored: bool,
-    pub deep: bool,
-    pub invert: bool,
-}
-
-impl AsciiConfig {
-    pub fn apply(&self, mut builder: AsciiBuilder) -> AsciiBuilder {
-        if let Some(n) = self.size {
-            builder = builder.set_resize((n * 2, n))
-        }
-        builder.set_deep(self.deep).set_invert(self.invert)
-    }
 }
 
 pub fn remove_formatting(s: &str) -> String {

@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.40"
-asciify = "0.1.6"
 base64 = "0.13.0"
 clap = "2.33.3"
 image = "0.23.14"
@@ -19,6 +18,7 @@ structopt = "0.3.21"
 term_size = "0.3.2"
 termcolor = "1.1.2"
 unicode-width = "0.1.8"
+viuer = "0.4.0"
 
 [dependencies.async-minecraft-ping]
 git = "https://github.com/LordMZTE/async-minecraft-ping.git"

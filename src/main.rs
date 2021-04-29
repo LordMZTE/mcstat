@@ -1,21 +1,12 @@
-use anyhow::{Context, Result};
-use asciify::AsciiBuilder;
+use anyhow::{anyhow, Context, Result};
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 
 use itertools::Itertools;
 use structopt::StructOpt;
-use termcolor::{Buffer, BufferWriter, ColorChoice, WriteColor};
 use time::{Duration, Instant};
 use tokio::time;
 
-use mcstat::{
-    get_table,
-    none_if_empty,
-    output::Table,
-    parse_base64_image,
-    remove_formatting,
-    AsciiConfig,
-};
+use mcstat::{get_table, none_if_empty, output::Table, parse_base64_image, remove_formatting};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -62,35 +53,24 @@ struct Opt {
     #[structopt(long, help = "displays forge mod channels if the server sends them")]
     channels: bool,
 
-    #[structopt(long, short, help = "print the server's favicon as ASCII art")]
+    #[structopt(long, short, help = "print the server's favicon to stdout")]
     image: bool,
-
-    #[structopt(
-        long,
-        short = "c",
-        requires = "image",
-        help = "print the server's favicon with color"
-    )]
-    color: bool,
 
     #[structopt(short, requires = "image", help = "size of the favicon ascii art")]
     size: Option<u32>,
+}
 
-    #[structopt(
-        long,
-        short,
-        requires = "image",
-        help = "print the ascii art favicon with more diverse chars"
-    )]
-    deep: bool,
-
-    #[structopt(
-        long,
-        short = "n",
-        requires = "image",
-        help = "inverts ascii art favicon"
-    )]
-    invert: bool,
+impl Opt {
+    fn get_viuer_conf(&self) -> viuer::Config {
+        let size = self.size.unwrap_or(16);
+        viuer::Config {
+            transparent: true,
+            absolute_offset: false,
+            width: Some(size * 2),
+            height: Some(size),
+            ..viuer::Config::default()
+        }
+    }
 }
 
 #[tokio::main]
@@ -132,23 +112,6 @@ async fn main() -> Result<()> {
     let response = serde_json::from_str::<StatusResponse>(&raw_response)?;
     // endregion
 
-    // region Image
-    let mut image = None;
-
-    if let (Some(favicon), true) = (&response.favicon, opt.image) {
-        // The image parsing and asciifying is done while the table is printing
-        image = Some(tokio::spawn(asciify_base64_image(
-            favicon.clone(),
-            AsciiConfig {
-                size: Some(opt.size.unwrap_or(16)),
-                colored: opt.color,
-                deep: opt.deep,
-                invert: opt.invert,
-            },
-        )));
-    }
-    // endregion
-
     // region printing
     // if the server has mods, and the user hasn't used the -m argument, notify
     // that.
@@ -165,45 +128,47 @@ async fn main() -> Result<()> {
     )
     .stdout()?;
 
-    if let Some(img) = image {
-        println!("\n{}", img.await??);
+    if let (Some(img), true) = (response.favicon, opt.image) {
+        let decoded = parse_base64_image(img)?;
+        viuer::print(&decoded, &opt.get_viuer_conf())
+            .map_err(|e| anyhow!("Failed to print favicon: {}", e))?;
     }
     // endregion
     Ok(())
 }
 
-/// returns the asciifyed image from base64
-/// returns Err if the base64 image is invalid
-async fn asciify_base64_image(favicon: String, config: AsciiConfig) -> Result<String> {
-    let image = parse_base64_image(favicon)?;
-
-    let builder = config.apply(AsciiBuilder::new_from_image(image));
-
-    let mut buf = if config.colored {
-        // this does not write to stdout but just gets the correct color
-        // information for stdout
-        let mut buf = BufferWriter::stdout(ColorChoice::Always).buffer();
-        builder.to_stream_colored(&mut buf);
-        buf
-    } else {
-        let mut buf = Buffer::no_color();
-        builder.to_stream(&mut buf);
-        buf
-    };
-    // reset color
-    buf.reset()?;
-
-    let bytes = buf.as_slice().to_vec();
-
-    // only check utf8 format in debug mode
-    #[cfg(debug_assertions)]
-    let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
-    // bytes should always be valid utf8
-    #[cfg(not(debug_assertions))]
-    let out = unsafe { String::from_utf8_unchecked(bytes) };
-
-    Ok(out)
-}
+// returns the asciifyed image from base64
+// returns Err if the base64 image is invalid
+// async fn asciify_base64_image(favicon: String, config: AsciiConfig) ->
+// Result<String> { let image = parse_base64_image(favicon)?;
+//
+// let builder = config.apply(AsciiBuilder::new_from_image(image));
+//
+// let mut buf = if config.colored {
+// this does not write to stdout but just gets the correct color
+// information for stdout
+// let mut buf = BufferWriter::stdout(ColorChoice::Always).buffer();
+// builder.to_stream_colored(&mut buf);
+// buf
+// } else {
+// let mut buf = Buffer::no_color();
+// builder.to_stream(&mut buf);
+// buf
+// };
+// reset color
+// buf.reset()?;
+//
+// let bytes = buf.as_slice().to_vec();
+//
+// only check utf8 format in debug mode
+// #[cfg(debug_assertions)]
+// let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
+// bytes should always be valid utf8
+// #[cfg(not(debug_assertions))]
+// let out = unsafe { String::from_utf8_unchecked(bytes) };
+//
+// Ok(out)
+// }
 
 fn format_table(
     response: &StatusResponse,
