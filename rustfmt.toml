@@ -1,0 +1,12 @@
+unstable_features = true
+binop_separator = "Back"
+format_code_in_doc_comments = true
+format_macro_matchers = true
+format_strings = true
+imports_layout = "HorizontalVertical"
+match_block_trailing_comma = true
+merge_imports = true
+normalize_comments = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+wrap_comments = true
