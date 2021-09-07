@@ -6,7 +6,7 @@ use structopt::StructOpt;
 use time::{Duration, Instant};
 use tokio::time;
 
-use mcstat::{get_table, none_if_empty, output::Table, parse_base64_image, remove_formatting};
+use mcstat::{get_table, mc_formatted_to_ansi, none_if_empty, output::Table, parse_base64_image};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -197,25 +197,29 @@ fn format_table(
         table.max_block_width = w;
     }
 
-    if let Some(s) = none_if_empty!(remove_formatting(&response.description.get_text())) {
+    if let Some(s) = none_if_empty!(mc_formatted_to_ansi(response.description.get_text())
+        .unwrap_or_else(|e| format!("Error: {}", e)))
+    {
         table.big_entry("Description", s);
     }
 
     if let ServerDescription::Big(big_desc) = &response.description {
         let desc = &big_desc.extra;
-        let txt = desc.into_iter().map(|p| p.text.clone()).collect::<String>();
+        let txt = desc.iter().map(|p| p.text.clone()).collect::<String>();
         if let Some(s) = none_if_empty!(txt) {
             table.big_entry("Extra Description", s);
         }
     }
 
-    if let Some(s) = none_if_empty!(remove_formatting(&player_sample)) {
+    if let Some(s) = none_if_empty!(
+        mc_formatted_to_ansi(&player_sample).unwrap_or_else(|e| format!("Error: {}", e))
+    ) {
         table.big_entry("Player Sample", s);
     }
 
     table.blank();
 
-    if let Some(s) = none_if_empty!(remove_formatting(&response.version.name)) {
+    if let Some(s) = none_if_empty!(&response.version.name) {
         table.small_entry("Server Version", s);
     }
 

@@ -3,9 +3,13 @@ extern crate smart_default;
 
 use crate::output::Table;
 use anyhow::{anyhow, bail, Context};
+use crossterm::{
+    style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
+    ExecutableCommand,
+};
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
-use std::io::Cursor;
+use std::io::{self, Cursor, Write};
 
 pub mod output;
 
@@ -26,18 +30,85 @@ macro_rules! none_if_empty {
     }};
 }
 
-pub fn remove_formatting(s: &str) -> String {
-    let chars = s.char_indices().rev();
-    let mut buf = s.to_owned();
-    for c in chars {
-        if c.1 == '§' {
-            buf.remove(c.0);
-            if c.0 < buf.len() {
-                buf.remove(c.0);
+/// Print mincraft-formatted text to `out` using crossterm
+pub fn print_mc_formatted(s: &str, mut out: impl Write) -> io::Result<()> {
+    macro_rules! exec {
+        (fg, $color:ident) => {
+            exec!(SetForegroundColor(Color::$color))
+        };
+
+        (at, $attr:ident) => {
+            exec!(SetAttribute(Attribute::$attr))
+        };
+
+        ($action:expr) => {{
+            out.execute($action)?;
+        }};
+    }
+
+    let mut splits = s.split('§');
+    if let Some(n) = splits.next() {
+        exec!(Print(n));
+    }
+
+    let mut empty = true;
+    for split in splits {
+        empty = false;
+        if let Some(c) = split.chars().next() {
+            match c {
+                // Colors
+                '0' => exec!(fg, Black),
+                '1' => exec!(fg, DarkBlue),
+                '2' => exec!(fg, DarkGreen),
+                '3' => exec!(fg, DarkCyan),
+                '4' => exec!(fg, DarkRed),
+                '5' => exec!(fg, DarkMagenta),
+                '6' => exec!(fg, DarkYellow),
+                '7' => exec!(fg, Grey),
+                '8' => exec!(fg, DarkGrey),
+                '9' => exec!(fg, Blue),
+                'a' => exec!(fg, Green),
+                'b' => exec!(fg, Cyan),
+                'c' => exec!(fg, Red),
+                'd' => exec!(fg, Magenta),
+                'e' => exec!(fg, Yellow),
+                'f' => exec!(fg, White),
+
+                // Formatting
+                // Obfuscated. This is the closest thing, althogh not many terminals support it.
+                'k' => exec!(at, RapidBlink),
+                'l' => exec!(at, Bold),
+                'm' => exec!(at, CrossedOut),
+                'n' => exec!(at, Underlined),
+                'o' => exec!(at, Italic),
+                'r' => exec!(ResetColor),
+                _ => {},
             }
+            exec!(Print(&split[1..]));
         }
     }
-    buf
+
+    // no need to reset color if there were no escape codes.
+    if !empty {
+        exec!(ResetColor);
+    }
+
+    Ok(())
+}
+
+pub fn mc_formatted_to_ansi(s: &str) -> io::Result<String> {
+    let mut bytes = Vec::new();
+    let mut c = Cursor::new(&mut bytes);
+    print_mc_formatted(s, &mut c)?;
+
+    // this shouldn't be able to fail, as we started of with a valid utf8 string.
+    #[cfg(debug_assertions)]
+    let out = String::from_utf8(bytes).unwrap();
+
+    #[cfg(not(debug_assertions))]
+    let out = unsafe { String::from_utf8_unchecked(bytes) };
+
+    Ok(out)
 }
 
 /// formats a iterator to a readable list
@@ -65,13 +136,13 @@ pub fn get_table<'a>(
 /// parses a base64 formatted image
 pub fn parse_base64_image(data: String) -> anyhow::Result<DynamicImage> {
     let (header, data) = data
-        .split_once(",")
+        .split_once(',')
         .context("Couldn't parse base64 image due to missing format header.")?;
     let (data_type, image_format) = header
-        .split_once("/")
+        .split_once('/')
         .context("Failed to parse base64 image, header has invalid format.")?;
     let image_format = image_format
-        .split(";")
+        .split(';')
         .next()
         .context("Failed to parse base64 image, header has invalid format.")?;
 
