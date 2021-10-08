@@ -2,13 +2,13 @@
 extern crate smart_default;
 
 use crate::output::Table;
-use anyhow::{anyhow, bail, Context};
 use crossterm::{
     style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
     ExecutableCommand,
 };
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
+use miette::{bail, miette, IntoDiagnostic, WrapErr};
 use std::io::{self, Cursor, Write};
 
 pub mod output;
@@ -82,7 +82,7 @@ pub fn print_mc_formatted(s: &str, mut out: impl Write) -> io::Result<()> {
                 'n' => exec!(at, Underlined),
                 'o' => exec!(at, Italic),
                 'r' => exec!(ResetColor),
-                _ => {},
+                _ => {}
             }
             exec!(Print(&split[1..]));
         }
@@ -134,28 +134,32 @@ pub fn get_table<'a>(
 }
 
 /// parses a base64 formatted image
-pub fn parse_base64_image(data: String) -> anyhow::Result<DynamicImage> {
+pub fn parse_base64_image(data: String) -> miette::Result<DynamicImage> {
     let (header, data) = data
         .split_once(',')
-        .context("Couldn't parse base64 image due to missing format header.")?;
+        .ok_or_else(|| miette!("Couldn't parse base64 image due to missing format header."))?;
     let (data_type, image_format) = header
         .split_once('/')
-        .context("Failed to parse base64 image, header has invalid format.")?;
+        .ok_or_else(|| miette!("Failed to parse base64 image, header has invalid format."))?;
     let image_format = image_format
         .split(';')
         .next()
-        .context("Failed to parse base64 image, header has invalid format.")?;
+        .ok_or_else(|| miette!("Failed to parse base64 image, header has invalid format."))?;
 
     if data_type != "data:image" {
         bail!("base64 image is not an image! Has type {}", data_type);
     }
 
-    let format = ImageFormat::from_extension(image_format).context(format!(
-        "Failed to parse base64 image due to unknown image type: {}",
-        image_format
-    ))?;
-    let data =
-        base64::decode(data).map_err(|e| anyhow!("Failed to decode base64 image data: {}", e))?;
+    let format = ImageFormat::from_extension(image_format).ok_or_else(|| {
+        miette!(
+            "Failed to parse base64 image due to unknown image type: {}",
+            image_format
+        )
+    })?;
+    let data = base64::decode(data)
+        .into_diagnostic()
+        .wrap_err("Failed to decode base64 image data")?;
     image::load(Cursor::new(data), format)
-        .map_err(|e| anyhow!("Failed to load base64 image: {}", e))
+        .into_diagnostic()
+        .wrap_err("Failed to load base64 image")
 }

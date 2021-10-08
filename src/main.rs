@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Context, Result};
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 
 use itertools::Itertools;
+use miette::{miette, IntoDiagnostic, WrapErr};
 use structopt::StructOpt;
 use time::{Duration, Instant};
 use tokio::time;
@@ -74,23 +74,24 @@ impl Opt {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    let opt = Opt::from_args_safe()?;
+async fn main() -> miette::Result<()> {
+    let opt = Opt::from_args();
 
     let mut ip = opt.ip.splitn(2, ':');
-    let config = ConnectionConfig::build(ip.next().context("invalid ip")?.to_owned())
-        .with_port(
-            ip.next()
-                .map_or(Err(()), |p| p.parse::<u16>().map_err(|_| ()))
-                .and_then(|p| if p > 0 { Ok(p) } else { Err(()) })
-                .unwrap_or(25565),
-        )
-        .with_protocol_version(opt.protocol_version);
+    let config =
+        ConnectionConfig::build(ip.next().ok_or_else(|| miette!("invalid ip"))?.to_owned())
+            .with_port(
+                ip.next()
+                    .map_or(Err(()), |p| p.parse::<u16>().map_err(|_| ()))
+                    .and_then(|p| if p > 0 { Ok(p) } else { Err(()) })
+                    .unwrap_or(25565),
+            )
+            .with_protocol_version(opt.protocol_version);
 
     // create timeout for server connection
     let (raw_response, ping) = time::timeout(Duration::from_millis(opt.timeout), async {
         let start_time = Instant::now();
-        let mut con = config.connect().await?;
+        let mut con = config.connect().await.into_diagnostic()?;
         // we end the timer here, because at this point, we've sent ONE request to the
         // server, and we don't want to send 2, since then we get double the
         // ping. the connect function may have some processing which may take
@@ -98,10 +99,11 @@ async fn main() -> Result<()> {
         // speed.
         let end_time = Instant::now();
 
-        let status = con.status_raw().await?;
-        Result::<_, anyhow::Error>::Ok((status, end_time - start_time))
+        let status = con.status_raw().await.into_diagnostic()?;
+        Result::<_, miette::Error>::Ok((status, end_time - start_time))
     })
     .await
+    .into_diagnostic()
     .context("Connection to server timed out.")??;
 
     if opt.raw {
@@ -109,7 +111,7 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let response = serde_json::from_str::<StatusResponse>(&raw_response)?;
+    let response = serde_json::from_str::<StatusResponse>(&raw_response).into_diagnostic()?;
     // endregion
 
     // region printing
@@ -126,12 +128,12 @@ async fn main() -> Result<()> {
         opt.modversions,
         opt.channels,
     )
-    .stdout()?;
+    .stdout()
+    .into_diagnostic()?;
 
     if let (Some(img), true) = (response.favicon, opt.image) {
         let decoded = parse_base64_image(img)?;
-        viuer::print(&decoded, &opt.get_viuer_conf())
-            .map_err(|e| anyhow!("Failed to print favicon: {}", e))?;
+        viuer::print(&decoded, &opt.get_viuer_conf()).into_diagnostic()?;
     }
     // endregion
     Ok(())
