@@ -9,7 +9,11 @@ use crossterm::{
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
 use miette::{bail, miette, IntoDiagnostic, WrapErr};
-use std::io::{self, Cursor, Write};
+use std::{
+    io::{self, Cursor, Write},
+    net::IpAddr,
+};
+use trust_dns_resolver::TokioAsyncResolver;
 
 pub mod output;
 
@@ -28,6 +32,54 @@ macro_rules! none_if_empty {
             Some(x)
         }
     }};
+}
+
+pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16)> {
+    let addr;
+    let port;
+    if let Some((addr_, port_)) = addr_and_port.split_once(':') {
+        addr = addr_;
+        port = Some(
+            port_
+                .parse()
+                .into_diagnostic()
+                .wrap_err("User provided port is invalid")?,
+        );
+    } else {
+        addr = addr_and_port;
+        port = None;
+    }
+
+    if let Some(port) = port {
+        Ok((addr.to_string(), port))
+    } else if addr.parse::<IpAddr>().is_ok() {
+        // if we only have an IP and no port, there is no domain to lookup so we can
+        // only default to port 25565.
+        Ok((addr.to_string(), 25565))
+    } else {
+        let dns = TokioAsyncResolver::tokio_from_system_conf()
+            .into_diagnostic()
+            .wrap_err("Failed to create DNS resolver")?;
+
+        let lookup = dns.srv_lookup(format!("_minecraft._tcp.{}.", addr)).await;
+
+        if let Ok(lookup) = lookup {
+            let srv = lookup
+                .iter()
+                .next()
+                .ok_or_else(|| miette!("No SRV record found"))?;
+
+            let addr = srv.target().to_string();
+            let addr = addr.trim_end_matches('.');
+
+            let port = srv.port();
+
+            Ok((addr.to_string(), port))
+        } else {
+            // if there is no SRV record, we have to default to port 25565
+            Ok((addr.to_string(), 25565))
+        }
+    }
 }
 
 /// Print mincraft-formatted text to `out` using crossterm
@@ -82,7 +134,7 @@ pub fn print_mc_formatted(s: &str, mut out: impl Write) -> io::Result<()> {
                 'n' => exec!(at, Underlined),
                 'o' => exec!(at, Italic),
                 'r' => exec!(ResetColor),
-                _ => {}
+                _ => {},
             }
             exec!(Print(&split[1..]));
         }

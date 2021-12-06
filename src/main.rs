@@ -1,12 +1,19 @@
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 
 use itertools::Itertools;
-use miette::{miette, IntoDiagnostic, WrapErr};
+use miette::{IntoDiagnostic, WrapErr};
 use structopt::StructOpt;
 use time::{Duration, Instant};
 use tokio::time;
 
-use mcstat::{get_table, mc_formatted_to_ansi, none_if_empty, output::Table, parse_base64_image};
+use mcstat::{
+    get_table,
+    mc_formatted_to_ansi,
+    none_if_empty,
+    output::Table,
+    parse_base64_image,
+    resolve_address,
+};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -16,8 +23,8 @@ use mcstat::{get_table, mc_formatted_to_ansi, none_if_empty, output::Table, pars
 struct Opt {
     #[structopt(
         index = 1,
-        help = "the ip of the server to ping. you may also specify the port, if it is not \
-                specified or invalid it will default to 25565"
+        help = "The Address to ping. By default, a SRV lookup will be made to resolve this, \
+                unless the port is specified."
     )]
     ip: String,
 
@@ -77,16 +84,13 @@ impl Opt {
 async fn main() -> miette::Result<()> {
     let opt = Opt::from_args();
 
-    let mut ip = opt.ip.splitn(2, ':');
-    let config =
-        ConnectionConfig::build(ip.next().ok_or_else(|| miette!("invalid ip"))?.to_owned())
-            .with_port(
-                ip.next()
-                    .map_or(Err(()), |p| p.parse::<u16>().map_err(|_| ()))
-                    .and_then(|p| if p > 0 { Ok(p) } else { Err(()) })
-                    .unwrap_or(25565),
-            )
-            .with_protocol_version(opt.protocol_version);
+    let (addr, port) = resolve_address(&opt.ip)
+        .await
+        .wrap_err("Error resolving address")?;
+
+    let config = ConnectionConfig::build(addr)
+        .with_port(port)
+        .with_protocol_version(opt.protocol_version);
 
     // create timeout for server connection
     let (raw_response, ping) = time::timeout(Duration::from_millis(opt.timeout), async {

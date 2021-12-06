@@ -17,6 +17,7 @@ smart-default = "0.6.0"
 structopt = "0.3.23"
 term_size = "0.3.2"
 termcolor = "1.1.2"
+trust-dns-resolver = { version = "0.20.3", features = ["tokio-runtime"] }
 unicode-width = "0.1.9"
 viuer = "0.5.2"
 
