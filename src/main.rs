@@ -1,6 +1,7 @@
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 
 use itertools::Itertools;
+use log::info;
 use miette::{IntoDiagnostic, WrapErr};
 use structopt::StructOpt;
 use time::{Duration, Instant};
@@ -82,11 +83,17 @@ impl Opt {
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
+    env_logger::try_init()
+        .into_diagnostic()
+        .wrap_err("Failed to init logger")?;
+
     let opt = Opt::from_args();
 
     let (addr, port) = resolve_address(&opt.ip)
         .await
         .wrap_err("Error resolving address")?;
+
+    info!("Using address '{}:{}'", &addr, &port);
 
     let config = ConnectionConfig::build(addr)
         .with_port(port)
@@ -94,15 +101,17 @@ async fn main() -> miette::Result<()> {
 
     // create timeout for server connection
     let (raw_response, ping) = time::timeout(Duration::from_millis(opt.timeout), async {
+        info!("Connecting to server");
         let start_time = Instant::now();
         let mut con = config.connect().await.into_diagnostic()?;
         // we end the timer here, because at this point, we've sent ONE request to the
         // server, and we don't want to send 2, since then we get double the
         // ping. the connect function may have some processing which may take
-        // some time, but it shouldn't make an impact at this code runs at rust
+        // some time, but it shouldn't make an impact since this code runs at rust
         // speed.
         let end_time = Instant::now();
 
+        info!("Requesting status");
         let status = con.status_raw().await.into_diagnostic()?;
         Result::<_, miette::Error>::Ok((status, end_time - start_time))
     })
@@ -115,10 +124,9 @@ async fn main() -> miette::Result<()> {
         return Ok(());
     }
 
+    info!("Parsing status");
     let response = serde_json::from_str::<StatusResponse>(&raw_response).into_diagnostic()?;
-    // endregion
 
-    // region printing
     // if the server has mods, and the user hasn't used the -m argument, notify
     // that.
     if let (false, Some(_)) = (opt.mods, response.forge_mod_info()) {
@@ -139,42 +147,8 @@ async fn main() -> miette::Result<()> {
         let decoded = parse_base64_image(img)?;
         viuer::print(&decoded, &opt.get_viuer_conf()).into_diagnostic()?;
     }
-    // endregion
     Ok(())
 }
-
-// returns the asciifyed image from base64
-// returns Err if the base64 image is invalid
-// async fn asciify_base64_image(favicon: String, config: AsciiConfig) ->
-// Result<String> { let image = parse_base64_image(favicon)?;
-//
-// let builder = config.apply(AsciiBuilder::new_from_image(image));
-//
-// let mut buf = if config.colored {
-// this does not write to stdout but just gets the correct color
-// information for stdout
-// let mut buf = BufferWriter::stdout(ColorChoice::Always).buffer();
-// builder.to_stream_colored(&mut buf);
-// buf
-// } else {
-// let mut buf = Buffer::no_color();
-// builder.to_stream(&mut buf);
-// buf
-// };
-// reset color
-// buf.reset()?;
-//
-// let bytes = buf.as_slice().to_vec();
-//
-// only check utf8 format in debug mode
-// #[cfg(debug_assertions)]
-// let out = String::from_utf8(bytes).expect("asciifyed image is invalid utf8");
-// bytes should always be valid utf8
-// #[cfg(not(debug_assertions))]
-// let out = unsafe { String::from_utf8_unchecked(bytes) };
-//
-// Ok(out)
-// }
 
 fn format_table(
     response: &StatusResponse,

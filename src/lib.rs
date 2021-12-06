@@ -8,6 +8,7 @@ use crossterm::{
 };
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
+use log::info;
 use miette::{bail, miette, IntoDiagnostic, WrapErr};
 use std::{
     io::{self, Cursor, Write},
@@ -35,9 +36,11 @@ macro_rules! none_if_empty {
 }
 
 pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16)> {
+    info!("Resolving address");
     let addr;
     let port;
     if let Some((addr_, port_)) = addr_and_port.split_once(':') {
+        info!("Address has explicit port");
         addr = addr_;
         port = Some(
             port_
@@ -46,6 +49,7 @@ pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16
                 .wrap_err("User provided port is invalid")?,
         );
     } else {
+        info!("Address has no explicit port");
         addr = addr_and_port;
         port = None;
     }
@@ -53,10 +57,12 @@ pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16
     if let Some(port) = port {
         Ok((addr.to_string(), port))
     } else if addr.parse::<IpAddr>().is_ok() {
+        info!("Got IP address without explicit port, assuming 25565");
         // if we only have an IP and no port, there is no domain to lookup so we can
         // only default to port 25565.
         Ok((addr.to_string(), 25565))
     } else {
+        info!("Sending SRV request");
         let dns = TokioAsyncResolver::tokio_from_system_conf()
             .into_diagnostic()
             .wrap_err("Failed to create DNS resolver")?;
@@ -64,6 +70,7 @@ pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16
         let lookup = dns.srv_lookup(format!("_minecraft._tcp.{}.", addr)).await;
 
         if let Ok(lookup) = lookup {
+            info!("Found SRV record");
             let srv = lookup
                 .iter()
                 .next()
@@ -76,6 +83,7 @@ pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16
 
             Ok((addr.to_string(), port))
         } else {
+            info!("No SRV record found. Defaulting to 25565");
             // if there is no SRV record, we have to default to port 25565
             Ok((addr.to_string(), 25565))
         }
@@ -187,6 +195,7 @@ pub fn get_table<'a>(
 
 /// parses a base64 formatted image
 pub fn parse_base64_image(data: String) -> miette::Result<DynamicImage> {
+    info!("Parsing base64 image");
     let (header, data) = data
         .split_once(',')
         .ok_or_else(|| miette!("Couldn't parse base64 image due to missing format header."))?;
