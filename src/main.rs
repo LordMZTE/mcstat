@@ -1,67 +1,65 @@
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 
+use clap::Parser;
 use itertools::Itertools;
 use miette::{IntoDiagnostic, WrapErr};
-use structopt::StructOpt;
 use time::{Duration, Instant};
 use tokio::time;
 
 use mcstat::{
-    get_table, mc_formatted_to_ansi, none_if_empty, output::Table, parse_base64_image,
-    resolve_address, EitherStatusResponse,
+    get_table,
+    mc_formatted_to_ansi,
+    none_if_empty,
+    output::Table,
+    parse_base64_image,
+    resolve_address,
+    EitherStatusResponse,
 };
-use tracing::info;
+use tracing::{info, Level};
 
-#[derive(Debug, StructOpt)]
-#[structopt(
-    name = "mcstat",
-    about = "queries information about a minecraft server"
-)]
+/// Queries information about a minecraft server
+#[derive(Debug, Parser)]
+#[clap(name = "mcstat")]
 struct Opt {
-    #[structopt(
-        index = 1,
-        help = "The Address to ping. By default, a SRV lookup will be made to resolve this, \
-                unless the port is specified."
-    )]
+    /// The Address to ping. By default, a SRV lookup will be made to resolve
+    /// this, unless the port is specified
     ip: String,
 
-    #[structopt(
-        long = "protocol",
-        help = "the protocol version to use",
-        default_value = "751"
-    )]
+    /// the protocol version to use
+    #[clap(long = "protocol", default_value = "751")]
     protocol_version: usize,
 
-    #[structopt(
-        long,
-        short,
-        help = "the time before the server ping times out in milliseconds",
-        default_value = "5000"
-    )]
+    /// the time before the server ping times out in milliseconds
+    #[clap(long, short, default_value = "5000")]
     timeout: u64,
 
-    #[structopt(long, short, help = "print raw json response")]
+    /// print raw json response
+    #[clap(long, short)]
     raw: bool,
 
-    #[structopt(long, short, help = "print mod list")]
+    /// print mod list
+    #[clap(long, short)]
     mods: bool,
 
-    #[structopt(
-        long,
-        short = "v",
-        requires = "mods",
-        help = "also prints mod versions"
-    )]
+    /// print mod versions
+    #[clap(long, short = 'V', requires = "mods")]
     modversions: bool,
 
-    #[structopt(long, help = "displays forge mod channels if the server sends them")]
+    /// displays forge mod channels if the server sends them
+    #[clap(long)]
     channels: bool,
 
-    #[structopt(long, short, help = "print the server's favicon to stdout")]
+    /// print the server's favicon to stdout
+    #[clap(long, short)]
     image: bool,
 
-    #[structopt(short, requires = "image", help = "size of the favicon ascii art")]
+    /// size of the favicon ascii art
+    #[clap(short, requires = "image")]
     size: Option<u32>,
+
+    /// use verbose logging
+    #[clap(long, short, parse(from_occurrences))]
+    verbose: u32,
 }
 
 impl Opt {
@@ -79,9 +77,19 @@ impl Opt {
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    tracing_subscriber::fmt().pretty().init();
+    let opt = Opt::parse();
 
-    let opt = Opt::from_args();
+    let log_level = match opt.verbose {
+        0 => Level::ERROR,
+        1 => Level::INFO,
+        2 => Level::DEBUG,
+        _ => Level::TRACE,
+    };
+
+    tracing_subscriber::fmt()
+        .compact()
+        .with_max_level(log_level)
+        .init();
 
     let (addr, port) = resolve_address(&opt.ip)
         .await

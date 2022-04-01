@@ -7,13 +7,13 @@ use crossterm::{
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
 use miette::{bail, miette, IntoDiagnostic, WrapErr};
-use tracing::info;
+use serde::Deserialize;
 use std::{
     io::{self, Cursor, Write},
     net::IpAddr,
 };
+use tracing::info;
 use trust_dns_resolver::TokioAsyncResolver;
-use serde::Deserialize;
 
 pub mod output;
 
