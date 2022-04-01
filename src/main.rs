@@ -1,20 +1,16 @@
 use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 
 use itertools::Itertools;
-use log::info;
 use miette::{IntoDiagnostic, WrapErr};
 use structopt::StructOpt;
 use time::{Duration, Instant};
 use tokio::time;
 
 use mcstat::{
-    get_table,
-    mc_formatted_to_ansi,
-    none_if_empty,
-    output::Table,
-    parse_base64_image,
-    resolve_address,
+    get_table, mc_formatted_to_ansi, none_if_empty, output::Table, parse_base64_image,
+    resolve_address, EitherStatusResponse,
 };
+use tracing::info;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -83,9 +79,7 @@ impl Opt {
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    env_logger::try_init()
-        .into_diagnostic()
-        .wrap_err("Failed to init logger")?;
+    tracing_subscriber::fmt().pretty().init();
 
     let opt = Opt::from_args();
 
@@ -125,7 +119,16 @@ async fn main() -> miette::Result<()> {
     }
 
     info!("Parsing status");
-    let response = serde_json::from_str::<StatusResponse>(&raw_response).into_diagnostic()?;
+    let response = serde_json::from_str::<EitherStatusResponse>(&raw_response).into_diagnostic()?;
+
+    let response = match response {
+        EitherStatusResponse::Text { text } => {
+            println!("The server says:\n{}", text);
+
+            return Ok(());
+        },
+        EitherStatusResponse::Normal(r) => r,
+    };
 
     // if the server has mods, and the user hasn't used the -m argument, notify
     // that.

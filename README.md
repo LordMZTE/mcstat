@@ -1,6 +1,6 @@
 # mcstat
 ### This tool pings a minecraft server and displays information about it. 
-## Currently this includes
+## This includes
 - protocol version
 - server version
 - player count
@@ -18,4 +18,4 @@
 
 ## TODO
 ---
-- [x] fork async-minecraft-ping in order to fix some bugs and implement mod list response (dev is not responding to [issue](https://github.com/jsvana/async-minecraft-ping/issues/3))
+- [x] fork async-minecraft-ping to fix some bugs and implement mod list response (dev is not responding to [issue](https://github.com/jsvana/async-minecraft-ping/issues/3))

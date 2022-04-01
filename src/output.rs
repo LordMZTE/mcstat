@@ -2,6 +2,7 @@ use std::{
     cmp::{max, min},
     io::{self, Write},
 };
+use smart_default::SmartDefault;
 use unicode_width::UnicodeWidthStr;
 
 #[derive(SmartDefault)]

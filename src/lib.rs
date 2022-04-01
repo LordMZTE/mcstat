@@ -1,20 +1,19 @@
-#[macro_use]
-extern crate smart_default;
-
 use crate::output::Table;
+use async_minecraft_ping::StatusResponse;
 use crossterm::{
     style::{Attribute, Color, Print, ResetColor, SetAttribute, SetForegroundColor},
     ExecutableCommand,
 };
 use image::{DynamicImage, ImageFormat};
 use itertools::Itertools;
-use log::info;
 use miette::{bail, miette, IntoDiagnostic, WrapErr};
+use tracing::info;
 use std::{
     io::{self, Cursor, Write},
     net::IpAddr,
 };
 use trust_dns_resolver::TokioAsyncResolver;
+use serde::Deserialize;
 
 pub mod output;
 
@@ -33,6 +32,13 @@ macro_rules! none_if_empty {
             Some(x)
         }
     }};
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum EitherStatusResponse {
+    Text { text: String },
+    Normal(StatusResponse),
 }
 
 pub async fn resolve_address(addr_and_port: &str) -> miette::Result<(String, u16)> {
