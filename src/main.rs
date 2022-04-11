@@ -8,9 +8,8 @@ use tokio::time;
 
 use mcstat::{
     get_table,
-    mc_formatted_to_ansi,
     none_if_empty,
-    output::Table,
+    output::{McFormatContent, Table},
     parse_base64_image,
     resolve_address,
     EitherStatusResponse,
@@ -184,13 +183,7 @@ fn format_table(
 
     let mut table = Table::new();
 
-    if let Some((w, _)) = term_size::dimensions() {
-        table.max_block_width = w;
-    }
-
-    if let Some(s) = none_if_empty!(mc_formatted_to_ansi(response.description.get_text())
-        .unwrap_or_else(|e| format!("Error: {}", e)))
-    {
+    if let Some(s) = none_if_empty!(McFormatContent(response.description.get_text().clone())) {
         table.big_entry("Description", s);
     }
 
@@ -198,26 +191,24 @@ fn format_table(
         let desc = &big_desc.extra;
         let txt = desc.iter().map(|p| p.text.clone()).collect::<String>();
         if let Some(s) = none_if_empty!(txt) {
-            table.big_entry("Extra Description", s);
+            table.big_entry("Extra Description", McFormatContent(s));
         }
     }
 
-    if let Some(s) = none_if_empty!(
-        mc_formatted_to_ansi(&player_sample).unwrap_or_else(|e| format!("Error: {}", e))
-    ) {
+    if let Some(s) = none_if_empty!(McFormatContent(player_sample)) {
         table.big_entry("Player Sample", s);
     }
 
     table.blank();
 
-    if let Some(s) = none_if_empty!(&response.version.name) {
+    if let Some(s) = none_if_empty!(response.version.name.clone()) {
         table.small_entry("Server Version", s);
     }
 
-    table.small_entry("Online Players", &response.players.online);
-    table.small_entry("Max Players", &response.players.max);
-    table.small_entry("Ping", ping);
-    table.small_entry("Protocol Version", &response.version.protocol);
+    table.small_entry("Online Players", response.players.online.to_string());
+    table.small_entry("Max Players", response.players.max.to_string());
+    table.small_entry("Ping", ping.to_string());
+    table.small_entry("Protocol Version", response.version.protocol.to_string());
 
     table.blank();
 
