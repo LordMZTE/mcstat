@@ -3,7 +3,7 @@ use async_minecraft_ping::{ConnectionConfig, ServerDescription, StatusResponse};
 use clap::Parser;
 use itertools::Itertools;
 use miette::{IntoDiagnostic, WrapErr};
-use time::{Duration, Instant};
+use time::Duration;
 use tokio::time;
 
 use mcstat::{
@@ -103,18 +103,13 @@ async fn main() -> miette::Result<()> {
     // create timeout for server connection
     let (raw_response, ping) = time::timeout(Duration::from_millis(opt.timeout), async {
         info!("Connecting to server");
-        let start_time = Instant::now();
         let mut con = config.connect().await.into_diagnostic()?;
-        // we end the timer here, because at this point, we've sent ONE request to the
-        // server, and we don't want to send 2, since then we get double the
-        // ping. the connect function may have some processing which may take
-        // some time, but it shouldn't make an impact since this code runs at rust
-        // speed.
-        let end_time = Instant::now();
 
         info!("Requesting status");
         let status = con.status_raw().await.into_diagnostic()?;
-        Result::<_, miette::Error>::Ok((status, end_time - start_time))
+        let ping = con.ping().await.into_diagnostic()?;
+
+        Result::<_, miette::Error>::Ok((status, ping))
     })
     .await
     .into_diagnostic()
